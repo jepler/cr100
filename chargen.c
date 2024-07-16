@@ -18,7 +18,7 @@ convert character row to line buffer:
 */
 
 // shade = array 0x0000, 0x5555, 0xaaaa, 0xffff
-// each loop generates 5 pixels so our time budget is 25 (/ 30 / 35 / 40 OC)
+// each loop generates 5(10) pixels so our time budget is 25 (/ 30 / 35 / 40 OC) (50etc)
 // cycles
 #define FB_WIDTH_CHAR (128)
 #define FB_HEIGHT_CHAR (53)
@@ -26,14 +26,19 @@ convert character row to line buffer:
 #define CHAR_Y (9)
 #define FB_HEIGHT_PIXEL (FB_HEIGHT_CHAR * CHAR_Y)
 void scan_convert(const uint16_t *cptr, uint16_t *vptr, const uint16_t *cgptr, const uint16_t *shade) {
-    for(int i=0; i<FB_WIDTH_CHAR; i++) {
-        uint16_t ch = *cptr++;
+    uint32_t *cptr32 = (void*)cptr;
+    uint32_t *vptr32 = (void*)vptr;
+    for(int i=FB_WIDTH_CHAR/2; --i; ) {
+        uint32_t ch = *cptr32++;
         uint16_t chardata = cgptr[ch & 0xff];
-        ch >>= 8;
-        int16_t mask = shade[ch & 7]; // 0123 = 4 colors 4567 = blink colors
-        ch >>= 3;
-        int16_t pixels = shade[ch] ^ (chardata & mask);
-        *vptr++ = pixels;
+        uint16_t mask = shade[(ch>>8)&7]; // 0123 = 4 colors 4567 = blink colors
+        uint32_t pixels = (shade[(ch >>11)&7] ^ (chardata & mask));
+
+        chardata = cgptr[(ch>>16) & 0xff];
+        mask = shade[(ch>>24)&7]; // 0123 = 4 colors 4567 = blink colors
+        pixels |= (shade[(ch >>27)&7] ^ (chardata & mask)) << 16;
+
+        *vptr32++ = pixels;
     }
 }
 
@@ -119,7 +124,7 @@ int writefn(void *cookie, const char *data, int n) {
                 cy = (cy + 1) % FB_HEIGHT_CHAR;
                 break;
             default:
-                if(*data > 32) {
+                if(*data >= 32) {
                     if(cx == FB_WIDTH_CHAR) {
                         cy = (cy + 1) % FB_HEIGHT_CHAR;
                         cx = 0;
@@ -158,7 +163,7 @@ int main() {
     uint16_t base_shade[] = {0, 0x5555, 0xaaaa, 0xffff, 0, 0x5555, 0xaaaa, 0xffff, 0, 0, 0, 0};
     memset(cram, 0, sizeof(cram));
     for (attr = 0; attr < 0x4000; attr += 0x100)
-        scrnprintf("AA BB ABA ", FB_WIDTH_CHAR, FB_HEIGHT_CHAR, CHAR_X, CHAR_Y);
+        scrnprintf("AA BB AB BA ABBA ", FB_WIDTH_CHAR, FB_HEIGHT_CHAR, CHAR_X, CHAR_Y);
 #if 0
     scrnprintf("%d x %d character mode\r\n%d x %d font\r\n", FB_WIDTH_CHAR, FB_HEIGHT_CHAR, CHAR_X, CHAR_Y);
     attr = 0x100;
