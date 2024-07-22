@@ -6,11 +6,12 @@ CFLAGS_arm = -Os -march=armv6-m -mthumb -mabi=aapcs -mcpu=cortex-m0plus -msoft-f
 	-isystem /home/jepler/src/pico-sdk/src/rp2040/hardware_regs/include/ \
 	-isystem /home/jepler/src/pico-sdk/src/common/pico_base/include/ \
 
-chargen.s: chargen.c
+chargen.s: chargen.c Makefile
 	arm-none-eabi-gcc-12.2.1 $(CFLAGS_arm) -S -o $@ $<
+	wc -l $@
 
 chargen.png: chargen
 	./$< | pnmtopng > $@
 
-chargen: chargen.c
+chargen: chargen.c Makefile
 	gcc -g $< -o $@

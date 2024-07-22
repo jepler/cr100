@@ -9,7 +9,7 @@
 #endif
 
 /*
-RAM usage (5x9 font, 2bpp, 128x53 -> 640x480):
+RAM usage (5x9 font, 2bpp, 132x53 -> 660x480):
 
 128 * 53 * 2 = 13568b character buffer (char + attr)
 128 * 2 * 3  = 768b line buffers
@@ -21,7 +21,7 @@ character RAM format:
 [etc]
 
 character row data format: interleaves pixel order, right justified
-AABBCCDDEExxxxxx
+xxxxAABBCCDDEExx
 
 convert character row to line buffer:
 */
@@ -29,33 +29,48 @@ convert character row to line buffer:
 // shade = array 0x0000, 0x5555, 0xaaaa, 0xffff
 // each loop generates 5(10) pixels so our time budget is 25 (/ 30 / 35 / 40 OC) (50etc)
 // cycles
-#define FB_WIDTH_CHAR (128)
+#define FB_WIDTH_CHAR (132)
 #define FB_HEIGHT_CHAR (53)
 #define CHAR_X (5)
 #define CHAR_Y (9)
 #define FB_HEIGHT_PIXEL (FB_HEIGHT_CHAR * CHAR_Y)
-__attribute__((optimize("unroll-all-loops")))
 void __not_in_flash_func(scan_convert)(const uint32_t * restrict cptr32, uint32_t * restrict vptr32, const uint16_t * restrict cgptr, const uint16_t * restrict shade) {
-    #pragma GCC unroll 8
-
-#define TWO_CHARS \
+#define READ_CHARDATA \
+    (ch = *cptr32++)
+#define ONE_CHAR(in_shift, op, out_shift) \
     do { \
-        uint32_t ch = *cptr32++; \
-        uint16_t chardata = cgptr[ch & 0xff]; \
-        uint16_t mask = shade[(ch>>8)&7]; \
-        uint32_t pixels = (shade[(ch >>11)&7] ^ (chardata & mask)) << 16; \
-        \
-        chardata = cgptr[(ch>>16) & 0xff]; \
-        mask = shade[(ch>>24)&7]; \
-        pixels |= (shade[(ch >>27)&7] ^ (chardata & mask)) << 6; \
-        \
-        *vptr32++ = pixels; \
+        chardata = cgptr[(ch>>(in_shift)) & 0xff]; \
+        mask = shade[(ch>>(8 + (in_shift)))&7]; \
+        pixels op (shade[(ch >>(11 + (in_shift)))&7] ^ (chardata & mask)) out_shift; \
+    } while(0)
+#define WRITE_PIXDATA \
+    (*vptr32++ = pixels)
+ 
+    uint32_t ch;
+    uint16_t chardata, mask;
+    uint32_t pixels;
+
+#define SIX_CHARS \
+    do { \
+        READ_CHARDATA; \
+        ONE_CHAR(0, =, << 20); \
+        ONE_CHAR(16, |=, << 10); \
+        READ_CHARDATA; \
+        ONE_CHAR(0, |=, ); \
+        WRITE_PIXDATA; \
+        ONE_CHAR(16, =, << 20); \
+        READ_CHARDATA; \
+        ONE_CHAR(0, |=, << 10); \
+        ONE_CHAR(16, |=, ); \
+        WRITE_PIXDATA; \
     } while(0)
 
-#define _8_CHARS TWO_CHARS; TWO_CHARS; TWO_CHARS; TWO_CHARS
-#define _32_CHARS _8_CHARS; _8_CHARS; _8_CHARS; _8_CHARS
-#define _128_CHARS _32_CHARS; _32_CHARS; _32_CHARS; _32_CHARS
-    _128_CHARS;
+    SIX_CHARS; SIX_CHARS; SIX_CHARS; SIX_CHARS; // 24
+    SIX_CHARS; SIX_CHARS; SIX_CHARS; SIX_CHARS; // 48
+    SIX_CHARS; SIX_CHARS; SIX_CHARS; SIX_CHARS; // 72
+    SIX_CHARS; SIX_CHARS; SIX_CHARS; SIX_CHARS; // 96
+    SIX_CHARS; SIX_CHARS; SIX_CHARS; SIX_CHARS; // 120
+    SIX_CHARS; SIX_CHARS;
 }
 
 #if defined(STANDALONE)
@@ -65,11 +80,11 @@ void __not_in_flash_func(scan_convert)(const uint32_t * restrict cptr32, uint32_
 #include <stdlib.h>
 
 void scan_to_pbmascii(const uint32_t *vram) {
-    for(int i=0; i<FB_WIDTH_CHAR / 2; i++) {
+    for(int i=0; i<FB_WIDTH_CHAR / 3; i++) {
         uint32_t v = vram[i];
 if (i < 8)
     fprintf(stderr, "%08x ", v);
-        for(int j=0; j<CHAR_X * 2; j++) {
+        for(int j=0; j<CHAR_X * 3; j++) {
             if(i || j) printf(" ");
             printf("%d", (v >> 30) & 3);
             v <<= 2;
@@ -82,16 +97,16 @@ fprintf(stderr, "\n");
 
 #define BIT_TAKE_DEPOSIT(b, from, to) ((((b) >> from) & 1) << to)
 #define CSWIZZLE(b) ( \
-    BIT_TAKE_DEPOSIT((b), 0, 6) | \
-    BIT_TAKE_DEPOSIT((b), 0, 7) | \
-    BIT_TAKE_DEPOSIT((b), 1, 8) | \
-    BIT_TAKE_DEPOSIT((b), 1, 9) | \
-    BIT_TAKE_DEPOSIT((b), 2, 10) | \
-    BIT_TAKE_DEPOSIT((b), 2, 11) | \
-    BIT_TAKE_DEPOSIT((b), 3, 12) | \
-    BIT_TAKE_DEPOSIT((b), 3, 13) | \
-    BIT_TAKE_DEPOSIT((b), 4, 14) | \
-    BIT_TAKE_DEPOSIT((b), 4, 15) | \
+    BIT_TAKE_DEPOSIT((b), 0, 2) | \
+    BIT_TAKE_DEPOSIT((b), 0, 3) | \
+    BIT_TAKE_DEPOSIT((b), 1, 4) | \
+    BIT_TAKE_DEPOSIT((b), 1, 5) | \
+    BIT_TAKE_DEPOSIT((b), 2, 6) | \
+    BIT_TAKE_DEPOSIT((b), 2, 7) | \
+    BIT_TAKE_DEPOSIT((b), 3, 8) | \
+    BIT_TAKE_DEPOSIT((b), 3, 9) | \
+    BIT_TAKE_DEPOSIT((b), 4, 10) | \
+    BIT_TAKE_DEPOSIT((b), 4, 11) | \
     0 )
 #define CHAR(i, r1, r2, r3, r4, r5, r6, r7, r8, r9) \
     [i+0*256] = CSWIZZLE(r1), \
@@ -129,11 +144,8 @@ uint16_t chargen[256*CHAR_Y] = {
 
 int cx, cy, attr = 0x300;
 
-_Static_assert(FB_WIDTH_CHAR % 2 == 0);
+_Static_assert(FB_WIDTH_CHAR % 6 == 0);
 uint32_t chardata32[FB_WIDTH_CHAR * FB_HEIGHT_CHAR / 2] = {
-};
-
-uint32_t framebuffer32[FB_WIDTH_CHAR * FB_HEIGHT_CHAR * CHAR_Y / 2] = {
 };
 
 int writefn(void *cookie, const char *data, int n) {
@@ -180,8 +192,8 @@ int main() {
     }
 #endif
 
-    uint32_t row32[FB_WIDTH_CHAR];
-    uint16_t base_shade[] = {0, 0x5540, 0xaa80, 0xffc0, 0, 0x5540, 0xaa80, 0xffc0, 0, 0, 0, 0};
+    uint32_t row32[FB_WIDTH_CHAR / 3];
+    uint16_t base_shade[] = {0, 0x554, 0xaa8, 0xffc, 0, 0x554, 0xaa8, 0xffc, 0, 0, 0, 0};
     memset(chardata32, 0, sizeof(chardata32));
     for (attr = 0; attr < 0x4000; attr += 0x100) {
         scrnprintf("AA BB AB BA ABBA ", FB_WIDTH_CHAR, FB_HEIGHT_CHAR, CHAR_X, CHAR_Y);
