@@ -40,11 +40,11 @@ void __not_in_flash_func(scan_convert)(const uint32_t * restrict cptr32, uint32_
         uint32_t ch = *cptr32++;
         uint16_t chardata = cgptr[ch & 0xff];
         uint16_t mask = shade[(ch>>8)&7]; // 0123 = 4 colors 4567 = blink colors
-        uint32_t pixels = (shade[(ch >>11)&7] ^ (chardata & mask));
+        uint32_t pixels = (shade[(ch >>11)&7] ^ (chardata & mask)) << 16;
 
         chardata = cgptr[(ch>>16) & 0xff];
         mask = shade[(ch>>24)&7]; // 0123 = 4 colors 4567 = blink colors
-        pixels |= (shade[(ch >>27)&7] ^ (chardata & mask)) << 16;
+        pixels |= (shade[(ch >>27)&7] ^ (chardata & mask)) << 6;
 
         *vptr32++ = pixels;
     }
@@ -56,15 +56,18 @@ void __not_in_flash_func(scan_convert)(const uint32_t * restrict cptr32, uint32_
 #include <stdarg.h>
 #include <stdlib.h>
 
-void scan_to_pbmascii(const uint16_t *vram) {
-    for(int i=0; i<FB_WIDTH_CHAR; i++) {
-        int v = vram[i];
-        for(int j=0; j<CHAR_X; j++) {
+void scan_to_pbmascii(const uint32_t *vram) {
+    for(int i=0; i<FB_WIDTH_CHAR / 2; i++) {
+        uint32_t v = vram[i];
+if (i < 8)
+    fprintf(stderr, "%08x ", v);
+        for(int j=0; j<CHAR_X * 2; j++) {
             if(i || j) printf(" ");
-            printf("%d", (v >> 14) & 3);
+            printf("%d", (v >> 30) & 3);
             v <<= 2;
         }
     }
+fprintf(stderr, "\n");
     printf("\n");
 }
 
@@ -170,10 +173,12 @@ int main() {
 #endif
 
     uint32_t row32[FB_WIDTH_CHAR];
-    uint16_t base_shade[] = {0, 0x5555, 0xaaaa, 0xffff, 0, 0x5555, 0xaaaa, 0xffff, 0, 0, 0, 0};
+    uint16_t base_shade[] = {0, 0x5540, 0xaa80, 0xffc0, 0, 0x5540, 0xaa80, 0xffc0, 0, 0, 0, 0};
     memset(chardata32, 0, sizeof(chardata32));
-    for (attr = 0; attr < 0x4000; attr += 0x100)
+    for (attr = 0; attr < 0x4000; attr += 0x100) {
         scrnprintf("AA BB AB BA ABBA ", FB_WIDTH_CHAR, FB_HEIGHT_CHAR, CHAR_X, CHAR_Y);
+        scrnprintf("AA BB AB BA ABBA ", FB_WIDTH_CHAR, FB_HEIGHT_CHAR, CHAR_X, CHAR_Y);
+    }
 #if 0
     scrnprintf("%d x %d character mode\r\n%d x %d font\r\n", FB_WIDTH_CHAR, FB_HEIGHT_CHAR, CHAR_X, CHAR_Y);
     attr = 0x100;
@@ -189,7 +194,7 @@ int main() {
         for(int j=0; j<CHAR_Y; j++) {
             scan_convert(&chardata32[FB_WIDTH_CHAR * i / 2], row32,
                 &chargen[256 * j], base_shade);
-            scan_to_pbmascii((uint16_t*)row32);
+            scan_to_pbmascii(row32);
         }
     }
 }
