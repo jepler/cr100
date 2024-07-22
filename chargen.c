@@ -34,20 +34,28 @@ convert character row to line buffer:
 #define CHAR_X (5)
 #define CHAR_Y (9)
 #define FB_HEIGHT_PIXEL (FB_HEIGHT_CHAR * CHAR_Y)
-__attribute__((optimize("unroll-loops")))
+__attribute__((optimize("unroll-all-loops")))
 void __not_in_flash_func(scan_convert)(const uint32_t * restrict cptr32, uint32_t * restrict vptr32, const uint16_t * restrict cgptr, const uint16_t * restrict shade) {
-    for(int i=FB_WIDTH_CHAR/2; --i; ) {
-        uint32_t ch = *cptr32++;
-        uint16_t chardata = cgptr[ch & 0xff];
-        uint16_t mask = shade[(ch>>8)&7]; // 0123 = 4 colors 4567 = blink colors
-        uint32_t pixels = (shade[(ch >>11)&7] ^ (chardata & mask)) << 16;
+    #pragma GCC unroll 8
 
-        chardata = cgptr[(ch>>16) & 0xff];
-        mask = shade[(ch>>24)&7]; // 0123 = 4 colors 4567 = blink colors
-        pixels |= (shade[(ch >>27)&7] ^ (chardata & mask)) << 6;
+#define TWO_CHARS \
+    do { \
+        uint32_t ch = *cptr32++; \
+        uint16_t chardata = cgptr[ch & 0xff]; \
+        uint16_t mask = shade[(ch>>8)&7]; \
+        uint32_t pixels = (shade[(ch >>11)&7] ^ (chardata & mask)) << 16; \
+        \
+        chardata = cgptr[(ch>>16) & 0xff]; \
+        mask = shade[(ch>>24)&7]; \
+        pixels |= (shade[(ch >>27)&7] ^ (chardata & mask)) << 6; \
+        \
+        *vptr32++ = pixels; \
+    } while(0)
 
-        *vptr32++ = pixels;
-    }
+#define _8_CHARS TWO_CHARS; TWO_CHARS; TWO_CHARS; TWO_CHARS
+#define _32_CHARS _8_CHARS; _8_CHARS; _8_CHARS; _8_CHARS
+#define _128_CHARS _32_CHARS; _32_CHARS; _32_CHARS; _32_CHARS
+    _128_CHARS;
 }
 
 #if defined(STANDALONE)
