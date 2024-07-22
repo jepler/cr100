@@ -1,4 +1,13 @@
+#define _GNU_SOURCE
 #include <stdint.h>
+
+#if __has_include(<pico/platform.h>)
+#include "pico/platform.h"
+#else
+#define STANDALONE
+#define __not_in_flash_func(x) x
+#endif
+
 /*
 RAM usage (5x9 font, 2bpp, 128x53 -> 640x480):
 
@@ -25,9 +34,8 @@ convert character row to line buffer:
 #define CHAR_X (5)
 #define CHAR_Y (9)
 #define FB_HEIGHT_PIXEL (FB_HEIGHT_CHAR * CHAR_Y)
-void scan_convert(const uint16_t *cptr, uint16_t *vptr, const uint16_t *cgptr, const uint16_t *shade) {
-    uint32_t *cptr32 = (void*)cptr;
-    uint32_t *vptr32 = (void*)vptr;
+__attribute__((optimize("unroll-loops")))
+void __not_in_flash_func(scan_convert)(const uint32_t * restrict cptr32, uint32_t * restrict vptr32, const uint16_t * restrict cgptr, const uint16_t * restrict shade) {
     for(int i=FB_WIDTH_CHAR/2; --i; ) {
         uint32_t ch = *cptr32++;
         uint16_t chardata = cgptr[ch & 0xff];
@@ -42,14 +50,11 @@ void scan_convert(const uint16_t *cptr, uint16_t *vptr, const uint16_t *cgptr, c
     }
 }
 
-#if defined(__linux)
-#define STANDALONE
-#endif
-
 #if defined(STANDALONE)
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 void scan_to_pbmascii(const uint16_t *vram) {
     for(int i=0; i<FB_WIDTH_CHAR; i++) {
@@ -113,8 +118,15 @@ uint16_t chargen[256*CHAR_Y] = {
 
 int cx, cy, attr = 0x300;
 
+_Static_assert(FB_WIDTH_CHAR % 2 == 0);
+uint32_t chardata32[FB_WIDTH_CHAR * FB_HEIGHT_CHAR / 2] = {
+};
+
+uint32_t framebuffer32[FB_WIDTH_CHAR * FB_HEIGHT_CHAR * CHAR_Y / 2] = {
+};
+
 int writefn(void *cookie, const char *data, int n) {
-    uint16_t *cram = cookie;
+    uint16_t *chardata = cookie;
     for(; n; data++, n--) {
         switch(*data) {
             case '\r':
@@ -129,23 +141,21 @@ int writefn(void *cookie, const char *data, int n) {
                         cy = (cy + 1) % FB_HEIGHT_CHAR;
                         cx = 0;
                     }
-                    cram[cx + cy * FB_WIDTH_CHAR] = *data | attr;
+                    chardata[cx + cy * FB_WIDTH_CHAR] = *data | attr;
                     cx ++;
                 }
         }
     }
 }
 
-uint16_t cram[FB_WIDTH_CHAR * FB_HEIGHT_CHAR] = {
-};
-
 int scrnprintf(const char *fmt, ...) {
-    char buf[1024];
+    char *ptr;
     va_list ap;
     va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, ap);
+    int n = vasprintf(&ptr, fmt, ap);
     va_end(ap);
-    writefn(cram, buf, strlen(buf));
+    writefn((void*)chardata32, ptr, n);
+    free(ptr);
 }
 
 int main() {
@@ -159,9 +169,9 @@ int main() {
     }
 #endif
 
-    uint16_t vram[FB_WIDTH_CHAR];
+    uint32_t row32[FB_WIDTH_CHAR];
     uint16_t base_shade[] = {0, 0x5555, 0xaaaa, 0xffff, 0, 0x5555, 0xaaaa, 0xffff, 0, 0, 0, 0};
-    memset(cram, 0, sizeof(cram));
+    memset(chardata32, 0, sizeof(chardata32));
     for (attr = 0; attr < 0x4000; attr += 0x100)
         scrnprintf("AA BB AB BA ABBA ", FB_WIDTH_CHAR, FB_HEIGHT_CHAR, CHAR_X, CHAR_Y);
 #if 0
@@ -177,9 +187,9 @@ int main() {
     printf("P2 %d %d 3\n", FB_WIDTH_CHAR * CHAR_X, FB_HEIGHT_CHAR * CHAR_Y);
     for(int i=0; i<FB_HEIGHT_CHAR; i++) {
         for(int j=0; j<CHAR_Y; j++) {
-            scan_convert(&cram[FB_WIDTH_CHAR * i], vram,
+            scan_convert(&chardata32[FB_WIDTH_CHAR * i / 2], row32,
                 &chargen[256 * j], base_shade);
-            scan_to_pbmascii(vram);
+            scan_to_pbmascii((uint16_t*)row32);
         }
     }
 }
