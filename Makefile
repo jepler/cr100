@@ -8,7 +8,7 @@ clean:
 chargen.png: chargen
 	./$< | pnmtopng > $@
 
-chargen: chargen.c Makefile
+chargen: chargen.c 5x9.h Makefile
 	gcc -g $< -o $@
 
 build/Makefile:
