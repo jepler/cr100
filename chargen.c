@@ -146,26 +146,7 @@ fprintf(stderr, "\n");
     [i+8*256] = CSWIZZLE(r9) \
 
 uint16_t chargen[256*CHAR_Y] = {
-    CHAR('A', 
-            0b00000,
-            0b01100,
-            0b10010,
-            0b10010,
-            0b11110,
-            0b10010,
-            0b10010,
-            0b10010,
-            0b00000),
-    CHAR('B', 
-            0b00000,
-            0b11100,
-            0b10010,
-            0b10010,
-            0b11100,
-            0b10010,
-            0b10010,
-            0b11100,
-            0b00000),
+#include "5x9.h"
 };
 
 int cx, cy, attr = 0x300;
@@ -356,10 +337,19 @@ int main() {
 #endif
     if(0)
         for (size_t i=0; i<count_of(chardata32); i++) { chardata32[i] = 0x08000800; }
+
+    attr = 0x300;
+
+    scrnprintf(
+"An overclock to 140MHz is also very stable if you wanted 720 pixels Some classic text modes could\r\n"
+"double the rightmost pixel of the 8-bit-wide font (typically, if the high bit of the character\r\n"
+"number was set) instead of outputting 0, so you could get block graphics but they would be\r\n"
+"slightly distorted worst with the \"shade\" characters but fine with almost everything else\n\r\n\r\n");
+
     for (int x = 0; x < 0x4000; x += 0x100) {
         attr = x;
-        scrnprintf("AA BB AB BA ABBA ", FB_WIDTH_CHAR, FB_HEIGHT_CHAR, CHAR_X, CHAR_Y);
-        scrnprintf("AA BB AB BA ABBA ", FB_WIDTH_CHAR, FB_HEIGHT_CHAR, CHAR_X, CHAR_Y);
+        scrnprintf("01234567890 wasd il -uwu_", FB_WIDTH_CHAR, FB_HEIGHT_CHAR, CHAR_X, CHAR_Y);
+        scrnprintf("AA BB AB BA gqgq ", FB_WIDTH_CHAR, FB_HEIGHT_CHAR, CHAR_X, CHAR_Y);
     }
 
 #if STANDALONE

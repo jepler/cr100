@@ -2,3 +2,4 @@ chargen
 chargen.s
 chargen.png
 build
+__pycache__
