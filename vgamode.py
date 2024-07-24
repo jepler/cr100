@@ -153,9 +153,8 @@ active:
 
 
     pio_yloop("wait 1 irq 0", mode.vfront_porch, "frontporch", f"{mode.vfront_porch} lines", file=file)
-    print(f"    set pins, {mode.vsync_polarity:d}", file=file)
 
-    pio_yloop("wait 1 irq 0", mode.vsync_pulse, "syncpulse", f"{mode.vsync_pulse} lines", file=file)
+    pio_yloop(f"wait 1 irq 0 side {mode.vsync_polarity:d}", mode.vsync_pulse, "syncpulse", f"{mode.vsync_pulse} lines", file=file)
 
     pio_yloop(f"wait 1 irq 0 side {not mode.vsync_polarity:d}", mode.vback_porch, "backporch", f"{mode.vback_porch} lines", file=file)
 
@@ -198,7 +197,7 @@ if 0:
     print(mode_vga_720x400, 6*mode_vga_720x400.pixel_clock_khz)
     print(mode_vga_660x400, 6*mode_vga_660x400.pixel_clock_khz)
 
-def print_all(mode, h_divisor=2, out_instr="out pins, 4", cycles_per_pixel=6):
+def print_all(mode, h_divisor=2, out_instr="out pins, 2", cycles_per_pixel=6):
     program_name = f"vga_{mode.visible_width}x{mode.visible_height}_{mode.frame_rate_hz:.0f}"
     print_pio_hsync_program(program_name, mode, h_divisor)
     print("\n\n\n")
