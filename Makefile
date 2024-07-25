@@ -3,7 +3,7 @@ all: chargen.png build/cr100.uf2
 
 .PHONY: clean
 clean:
-	rm chargen.s chargen.png build
+	rm -rf chargen.s chargen.png build
 
 chargen.png: chargen
 	./$< | pnmtopng > $@
@@ -14,9 +14,16 @@ chargen: chargen.c 5x9.h Makefile
 build/Makefile:
 	cmake -S . -B build
 
+.PHONY: submodules
+submodules:
+	git submodule update --init && cd pico-sdk && git submodule update --init lib/tinyusb
+
+.PHONY: uf2
+uf2: build/cr100.uf2
+	$(MAKE) -C build
+
 .PHONY: build/cr100.uf2
 build/cr100.uf2: build/Makefile
-	$(MAKE) -C build
 
 .PHONY: flash
 flash: build/cr100.uf2
