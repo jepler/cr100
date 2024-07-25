@@ -6,25 +6,9 @@
 #include "pico/multicore.h"
 #include "vga_660x480_60.pio.h"
 
+#include "vt.h"
+
 int pixels_sm;
-
-/*
-RAM usage (5x9 font, 2bpp, 132x53 -> 660x480):
-
-128 * 53 * 2 = 13568b character buffer (char + attr)
-128 * 2 * 3  = 768b line buffers
-256 * 9      = 2304b character RAM
-
-character RAM format:
-[row 0 of each character]
-[row 1 of each character]
-[etc]
-
-character row data format: interleaves pixel order, right justified
-xxxxAABBCCDDEExx
-
-convert character row to line buffer:
-*/
 
 #define WRITE_PIXDATA \
     (pio0->txf[0] = pixels)
@@ -118,6 +102,7 @@ void setattr(int cx, int cy, int attr) {
     uint16_t *chardata = (void*)chardata32;
     int i = cx + cy * FB_WIDTH_CHAR;
     chardata[i] = (chardata[i] & 0xff) | attr;
+printf("setattr %d %d -> %d [%04x]\n", cx, cy, attr, chardata[i]);
 }
 
 int writefn(void *cookie, const char *data, int n) {
@@ -242,6 +227,53 @@ void hide_cursor() {
 
 #define MAKE_ATTR(fg, bg) ((fg) ^ (((bg) * 9) & 073))
 
+esc_state vt_st;
+
+void invert_screen() {
+    for(size_t i=0; i<count_of(chardata32); i++) { chardata32[i] ^= 0x18001800; }
+}
+
+void clear_eol() {
+    uint16_t *chardata = (void*)chardata32;
+    for(int x = cx; x < FB_WIDTH_CHAR; x++) {
+        chardata[cx + cy * FB_WIDTH_CHAR] = 32 | attr;
+    }
+}
+
+void clear_screen() {
+    uint32_t x = (32 | attr) | ((32 | attr) << 16);
+    for(size_t i=0; i<count_of(chardata32); i++) { chardata32[i] = x; }
+}
+
+void cursor_left() {
+    if(cx > 0) cx -= 1;
+}
+
+void cursor_position(esc_state *st) {
+    if(st->esc_param[0] < 0 || st->esc_param[0] > FB_WIDTH_CHAR) { return; }
+    if(st->esc_param[1] < 0 || st->esc_param[1] > FB_HEIGHT_CHAR) { return; }
+    cx = st->esc_param[0];
+    cy = st->esc_param[1];
+}
+
+int map_one(int i) {
+    return (i > 0) + (i > 6);
+}
+
+void char_attr(esc_state *st) {
+    int new_fg = 2;
+    int new_bg = 0;
+
+    for(int i= 0; i<count_of(st->esc_param); i++) {
+        int p = st->esc_param[i];
+        if (30 <= p && p <= 37) new_fg = map_one(p - 30);
+        if (90 <= p && p <= 97) new_fg = map_one(p - 90);
+        if (40 <= p && p <= 47) new_fg = map_one(p - 40);
+        if (100 <= p && p <= 107) new_fg = map_one(p - 100);
+    }
+    attr = MAKE_ATTR(new_fg, new_bg) << 8;
+}
+
 int main() {
 #if !STANDALONE
     set_sys_clock_khz(vga_660x480_60_sys_clock_khz, false);
@@ -270,13 +302,50 @@ int main() {
     show_cursor();
     while (true) {
         int c = getchar();
-        if (c != EOF) {
-            hide_cursor();
-            if(c == '\r')
-                scrnprintf("\n");
-            scrnprintf("%c", c);
-            show_cursor();
+        if (c == EOF) { continue; }
+
+        vt_action action = vt_process_code(&vt_st, c);
+
+        if (action == NO_OUTPUT) { continue; }
+
+        hide_cursor();
+        switch(action) {
+            case NO_OUTPUT:
+                __builtin_unreachable();
+
+            case PRINTABLE:
+                scrnprintf("%c", c);
+                if(c == '\r')
+                    scrnprintf("\n");
+                break;
+
+            case BELL:
+                invert_screen();
+                sleep_ms(100);
+                invert_screen();
+                break;
+
+            case CLEAR_EOL:
+                clear_eol();
+                break;
+
+            case CLEAR_SCREEN:
+                clear_screen();
+                break;
+
+            case CURSOR_LEFT:
+                cursor_left();
+                break;
+
+            case CURSOR_POSITION:
+                cursor_position(&vt_st);
+                break;
+
+            case CHAR_ATTR:
+                char_attr(&vt_st);
+                break;
         }
+        show_cursor();
     }
 
     return 0;
