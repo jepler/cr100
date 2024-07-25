@@ -15,14 +15,12 @@ int pixels_sm;
 #define FIFO_WAIT \
     do { /* NOTHING */ }  while(pio_sm_get_tx_fifo_level(pio0, 0) > 2)
 
-// shade = array 0x0000, 0x5555, 0xaaaa, 0xffff
-// each loop generates 5(10) pixels so our time budget is 25 (/ 30 / 35 / 40 OC) (50etc)
-// cycles
 #define FB_WIDTH_CHAR (132)
 #define FB_HEIGHT_CHAR (53)
 #define CHAR_X (5)
 #define CHAR_Y (9)
 #define FB_HEIGHT_PIXEL (FB_HEIGHT_CHAR * CHAR_Y)
+
 void __not_in_flash_func(scan_convert)(const uint32_t * restrict cptr32, const uint16_t * restrict cgptr, const uint16_t * restrict shade) {
 #define READ_CHARDATA \
     (ch = *cptr32++)
@@ -158,7 +156,7 @@ static void setup_vga_vsync(PIO pio) {
     uint offset = pio_add_program(pio, &vga_660x480_60_vsync_program);
     uint sm = pio_claim_unused_sm(pio, true);
     vga_660x480_60_vsync_program_init(pio, sm, offset, VSYNC_PIN);
-    pio_sm_put_blocking(pio, sm, 480-1);
+    pio_sm_put_blocking(pio, sm, 477-1);
 }
 
 static int setup_vga_pixels(PIO pio) {
@@ -182,29 +180,44 @@ void __not_in_flash_func(scan_convert_static_row)(int32_t pixels) {
     ONE_SCAN;
 }
 
-volatile int core1_data = 0;
 void __not_in_flash_func(core1_entry)() {
-    // volatile uint32_t *dptr = &pio0->txf[0];
-    while(false) {
-        scan_convert_static_row(0xf000000);
-        scan_convert_static_row(0xff00000);
-        scan_convert_static_row(0xffff000);
-        scan_convert_static_row(0);
-    }
-
     int frameno = 0;
+    setup_vga();
+
+    // Something causes a 1-fifo-entry shift. I failed to diagnose it so this
+    // terrible workaround is put into place: it shifts out a whole screen
+    // minus one FIFO entry.  *sob*
+    // (also the top text row is not visible on my test LCD but who knows why
+    // this could be. we'll get it on real HW and find out what's what.)
+    {
+        uint32_t pixels = 0;
+        for(int i=0; i<21; i++) {
+            WRITE_PIXDATA;
+            WRITE_PIXDATA;
+            WRITE_PIXDATA;
+            WRITE_PIXDATA;
+            WRITE_PIXDATA;
+            WRITE_PIXDATA;
+            FIFO_WAIT;
+        }
+        WRITE_PIXDATA;
+        WRITE_PIXDATA;
+        WRITE_PIXDATA;
+        WRITE_PIXDATA;
+        WRITE_PIXDATA;
+        FIFO_WAIT;
+        for(int i=0; i<476; i++) {
+            scan_convert_static_row(0);
+        }
+    }
     while(true) {
-        scan_convert_static_row(0x5555555);
         for(int row = 0; row < FB_HEIGHT_CHAR; row++) {
             for(int j=0; j<CHAR_Y; j++) {
                 scan_convert(&chardata32[FB_WIDTH_CHAR * row / 2],
                     &chargen[256 * j], frameno & 0x20 ? base_shade : base_shade + 4);
             }
         }
-        scan_convert_static_row(0);
-        scan_convert_static_row(0x5555555);
         
-        core1_data += 1;
         frameno += 1;
     }
 }
@@ -281,7 +294,7 @@ int main() {
 #endif
 
     scrnprintf(
-"\r\n"
+"(line 0)\r\n"
 "CR100 terminal demo...\r\n"
 );
 
@@ -296,7 +309,6 @@ int main() {
     }
 
     printf("setup_vga()\n");
-    setup_vga();
     multicore_launch_core1(core1_entry);
     attr = 0x300;
     show_cursor();
