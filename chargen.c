@@ -229,17 +229,18 @@ void __not_in_flash_func(core1_entry)() {
 #define FG_ATTR(x) ((x) << 8)
 
 int saved_attr;
-void hide_cursor() {
+void show_cursor() {
     int xx = cx == FB_WIDTH_CHAR ? FB_WIDTH_CHAR - 1 : cx;
     saved_attr = readattr(xx, cy);
     setattr(xx, cy, saved_attr ^ BG_ATTR(7));
 }
 
-void show_cursor() {
+void hide_cursor() {
     int xx = cx == FB_WIDTH_CHAR ? FB_WIDTH_CHAR - 1 : cx;
     setattr(xx, cy, saved_attr);
 }
 
+#define MAKE_ATTR(fg, bg) ((fg) ^ (((bg) * 9) & 073))
 
 int main() {
 #if !STANDALONE
@@ -252,6 +253,16 @@ int main() {
 "CR100 terminal demo...\r\n"
 );
 
+    for(int bg = 0; bg < 8; bg++) {
+        for(int fg = 0; fg < 8; fg++) {
+            attr = MAKE_ATTR(fg, bg) << 8;
+            scrnprintf(" %o%o ", bg, fg);
+            attr = 0x300;
+            scrnprintf(" ");
+        }
+        scrnprintf("\r\n");
+    }
+
     printf("setup_vga()\n");
     setup_vga();
     multicore_launch_core1(core1_entry);
@@ -261,8 +272,8 @@ int main() {
         int c = getchar();
         if (c != EOF) {
             hide_cursor();
-            if(c == '\n')
-                scrnprintf("\r");
+            if(c == '\r')
+                scrnprintf("\n");
             scrnprintf("%c", c);
             show_cursor();
         }
