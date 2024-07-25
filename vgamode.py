@@ -110,6 +110,16 @@ activeporch:
 
 """, file=file)
 
+    cycles, err = divmod(mode.hsync_pulse + err, h_divisor)
+    print(f"syncpulse: ; {mode.hsync_pulse}/{h_divisor} clocks [actual {cycles} error {err}]", file=file)
+    pio_hard_delay(f"set pins, {mode.hsync_polarity:d}", cycles, file=file)
+
+    cycles, err = divmod(mode.hback_porch + err, h_divisor)
+    print(f"backporch: ; {mode.hback_porch}/{h_divisor} clocks [actual {cycles} error {err}]", file=file)
+    pio_hard_delay(f"set pins, {not mode.hsync_polarity:d}", cycles - 1, file=file)
+    print("    irq 0 [1]", file=file)
+    print(".wrap", file=file)
+
     print(f"""
 % c-sdk {{
 static inline void {program_name_base}_hsync_program_init(PIO pio, uint sm, uint offset, uint pin) {{
@@ -133,16 +143,6 @@ static inline void {program_name_base}_hsync_program_init(PIO pio, uint sm, uint
 
 %}}
 """, file=file)
-
-    cycles, err = divmod(mode.hsync_pulse + err, h_divisor)
-    print(f"syncpulse: ; {mode.hsync_pulse}/{h_divisor} clocks [actual {cycles} error {err}]", file=file)
-    pio_hard_delay(f"set pins, {mode.hsync_polarity:d}", cycles, file=file)
-
-    cycles, err = divmod(mode.hback_porch + err, h_divisor)
-    print(f"backporch: ; {mode.hback_porch}/{h_divisor} clocks [actual {cycles} error {err}]", file=file)
-    pio_hard_delay(f"set pins, {not mode.hsync_polarity:d}", cycles - 1, file=file)
-    print("    irq 0 [1]", file=file)
-    print(".wrap", file=file)
 
 def pio_yloop(instr, n, label, comment, file):
     assert n <= 65
@@ -176,6 +176,15 @@ def print_pio_vsync_program(program_name_base, mode, cycles_per_pixel, file=sys.
     pull block                        ; Pull from FIFO to OSR (only once)
 
 .wrap_target                      ; Program wraps to here
+""", file=file)
+
+    pio_yloop("wait 1 irq 0", mode.vfront_porch, "frontporch", f"{mode.vfront_porch} lines", file=file)
+
+    pio_yloop(f"wait 1 irq 0 side {mode.vsync_polarity:d}", mode.vsync_pulse, "syncpulse", f"{mode.vsync_pulse} lines", file=file)
+
+    pio_yloop(f"wait 1 irq 0 side {not mode.vsync_polarity:d}", mode.vback_porch, "backporch", f"{mode.vback_porch} lines", file=file)
+
+    print(f"""
 ; ACTIVE
     mov x, osr                        ; Copy value from OSR to x scratch register
 active:
@@ -184,6 +193,9 @@ active:
     jmp x-- active                ; Remain in active mode, decrementing counter
 
 """, file=file)
+
+
+    print(".wrap", file=file)
 
     print(f"""
 % c-sdk {{
@@ -214,14 +226,6 @@ static inline void {program_name_base}_vsync_program_init(PIO pio, uint sm, uint
 """, file=file)
 
 
-    pio_yloop("wait 1 irq 0", mode.vfront_porch, "frontporch", f"{mode.vfront_porch} lines", file=file)
-
-    pio_yloop(f"wait 1 irq 0 side {mode.vsync_polarity:d}", mode.vsync_pulse, "syncpulse", f"{mode.vsync_pulse} lines", file=file)
-
-    pio_yloop(f"wait 1 irq 0 side {not mode.vsync_polarity:d}", mode.vback_porch, "backporch", f"{mode.vback_porch} lines", file=file)
-
-    print(".wrap", file=file)
-
 
 def print_pio_pixel_program(program_name_base, mode, out_instr, cycles_per_pixel, file=sys.stdout):
     net_khz = cycles_per_pixel * mode.pixel_clock_khz
@@ -232,6 +236,7 @@ def print_pio_pixel_program(program_name_base, mode, out_instr, cycles_per_pixel
 ; PIO clock frequency = {cycles_per_pixel}×{mode.pixel_clock_khz}khz = {net_khz}
     pull block                  ; Pull from FIFO to OSR (only once)
     mov y, osr                  ; Copy value from OSR to y scratch register
+    pull block                  ; Pull first pixel data
 
 .wrap_target
     set pins, 0                   ; Zero RGB pins in blanking
