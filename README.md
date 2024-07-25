@@ -101,8 +101,8 @@ Heirloom VGA 640x480@60Hz:
 
 My 660x480@60Hz mode:
  * 26MHz dot clock
- * 660 visible pixels, 825 total pixels = 31.78kHz horizontal rate (0.14% high)
- * 480 visible lines, 525 total lines = 60.03Hz vertical rate (0.14% high)
+ * 660 visible pixels, 825 total pixels = 31.78kHz horizontal rate (1.4% high)
+ * 480 visible lines, 525 total lines = 60.03Hz vertical rate (1.4% high)
 
 I don't expect there to be any problem for an old monitor to sync to this signal.
 
