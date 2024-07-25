@@ -3,7 +3,7 @@ all: chargen.png build/cr100.uf2
 
 .PHONY: clean
 clean:
-	rm -rf chargen.s chargen.png build
+	rm -rf chargen.png build
 
 chargen.png: chargen
 	./$< | pnmtopng > $@
