@@ -5,7 +5,7 @@
 #include "pico/platform.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
-#include "vga_660_480_60.pio.h"
+#include "vga_660x480_60.pio.h"
 
 int pixels_sm;
 #else
@@ -197,74 +197,6 @@ uint16_t base_shade[] = {0, 0x554, 0xaa8, 0xffc, 0, 0x554, 0xaa8, 0xffc, 0, 0, 0
 #define VSYNC_PIN (17)
 #define G0_PIN (9) // "green 3" on VGA pico demo base
 
-// TODO generate this in the pio file!
-static inline void vga_660x480_60_hsync_program_init(PIO pio, uint sm, uint offset, uint pin) {
-
-    pio_sm_config c = vga_660x480_60_hsync_program_get_default_config(offset);
-
-    // Map the state machine's SET pin group to one pin, namely the `pin`
-    // parameter to this function.
-    sm_config_set_set_pins(&c, pin, 1);
-    sm_config_set_clkdiv(&c, 6.f);
-    // Set this pin's GPIO function (connect PIO to the pad)
-    pio_gpio_init(pio, pin);
-    // Set the pin direction to output at the PIO
-    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
-
-    // Load our configuration, and jump to the start of the program
-    pio_sm_init(pio, sm, offset, &c);
-    // Set the state machine running
-    pio_sm_set_enabled(pio, sm, true);
-}
-
-// TODO generate this in the pio file!
-static inline void vga_660x480_60_vsync_program_init(PIO pio, uint sm, uint offset, uint pin) {
-
-    pio_sm_config c = vga_660x480_60_vsync_program_get_default_config(offset);
-
-    // Map the state machine's SIDESET to one pin, namely the `pin`
-    // parameter to this function.
-    // sm_config_set_sideset(&c, 1, true, false);
-    sm_config_set_sideset_pins(&c, pin);
-    sm_config_set_sideset(&c, 2, true, false);
-    sm_config_set_clkdiv(&c, 6.f);
-
-    // Set this pin's GPIO function (connect PIO to the pad)
-    pio_gpio_init(pio, pin);
-    // Set the pin direction to output at the PIO
-    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
-
-    // Load our configuration, and jump to the start of the program
-    pio_sm_init(pio, sm, offset, &c);
-    // Set the state machine running
-    pio_sm_set_enabled(pio, sm, true);
-}
-
-// TODO generate this in the pio file!
-static inline void vga_660x480_60_pixels_program_init(PIO pio, uint sm, uint offset, uint pin) {
-
-    pio_sm_config c = vga_660x480_60_pixels_program_get_default_config(offset);
-
-    // Map the state machine's OUT & SET pins
-    sm_config_set_out_pins(&c, pin, 2);
-    sm_config_set_set_pins(&c, pin, 2);
-    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
-    // 15 pixels (30 bits) per word, left is MSB
-    sm_config_set_out_shift(&c, false, true, 30);
-
-    // Set this pin's GPIO function (connect PIO to the pad)
-    pio_gpio_init(pio, pin);
-    pio_gpio_init(pio, pin+1);
-    // Set the pin direction to output at the PIO
-    pio_sm_set_consecutive_pindirs(pio, sm, pin, 2, true);
-
-    // Load our configuration, and jump to the start of the program
-    pio_sm_init(pio, sm, offset, &c);
-    // Set the state machine running
-    pio_sm_set_enabled(pio, sm, true);
-}
-
-
 static void setup_vga_hsync(PIO pio) {
     uint offset = pio_add_program(pio, &vga_660x480_60_hsync_program);
     uint sm = pio_claim_unused_sm(pio, true);
@@ -282,7 +214,7 @@ static void setup_vga_vsync(PIO pio) {
 static int setup_vga_pixels(PIO pio) {
     uint offset = pio_add_program(pio, &vga_660x480_60_pixels_program);
     uint sm = pio_claim_unused_sm(pio, true);
-    vga_660x480_60_pixels_program_init(pio, sm, offset, G0_PIN);
+    vga_660x480_60_pixels_program_init(pio, sm, offset, G0_PIN, 2);
     pio_sm_put_blocking(pio, sm, 660-1);
     return sm;
 }
@@ -331,8 +263,7 @@ void __not_in_flash_func(core1_entry)() {
 
 int main() {
 #if !STANDALONE
-    set_sys_clock_khz(156000, false);
-    // set_sys_clock_pll(130, 5, 2);
+    set_sys_clock_khz(vga_660x480_60_sys_clock_khz, false);
     stdio_init_all();
 #endif
     if(0)

@@ -3,3 +3,4 @@ chargen.s
 chargen.png
 build
 __pycache__
+vga_*.pio

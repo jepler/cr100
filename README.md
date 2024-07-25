@@ -95,19 +95,16 @@ coincidence and only required fudging VGA timings slightly.
 ## Timing accuracy
 
 Heirloom VGA 640x480@60Hz:
- * 25.125MHz dot clock
- * 640 visible pixels, 800 total pixels = 31.40kHz horizontal rate
+ * 25.175MHz dot clock
+ * 640 visible pixels, 800 total pixels = 31.47kHz horizontal rate
  * 480 visible lines, 525 total lines = 59.92Hz vertical rate
 
 My 660x480@60Hz mode:
- * 26MHz dot clock
- * 660 visible pixels, 825 total pixels = 31.78kHz horizontal rate (1.4% high)
- * 480 visible lines, 525 total lines = 60.03Hz vertical rate (1.4% high)
+ * 26.000MHz dot clock
+ * 660 visible pixels, 826 total pixels = 31.48kHz horizontal rate (<1% high)
+ * 480 visible lines, 525 total lines = 59.96Hz vertical rate (<1% high)
 
 I don't expect there to be any problem for an old monitor to sync to this signal.
-However, a total of 828 horizontal pixels per line would be much closer to
-the real line time; my mode generating script did not take account of the specific
-attainable clocks on the rp2040.
 
 # License
 
