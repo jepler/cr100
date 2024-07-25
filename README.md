@@ -105,6 +105,9 @@ My 660x480@60Hz mode:
  * 480 visible lines, 525 total lines = 60.03Hz vertical rate (1.4% high)
 
 I don't expect there to be any problem for an old monitor to sync to this signal.
+However, a total of 828 horizontal pixels per line would be much closer to
+the real line time; my mode generating script did not take account of the specific
+attainable clocks on the rp2040.
 
 # License
 
