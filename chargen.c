@@ -278,10 +278,14 @@ void cursor_left() {
 }
 
 void cursor_position(esc_state *st) {
-    if(st->esc_param[0] < 0 || st->esc_param[0] > FB_WIDTH_CHAR) { return; }
-    if(st->esc_param[1] < 0 || st->esc_param[1] > FB_HEIGHT_CHAR) { return; }
-    cx = st->esc_param[0];
-    cy = st->esc_param[1];
+    // param 1 is row (cy), 1-bsaed
+    if(st->esc_param[1] > 0 && st->esc_param[1] < FB_WIDTH_CHAR) {
+        cx = st->esc_param[1] - 1;
+    }
+    // param 1 is column (cx), 1-bsaed
+    if(st->esc_param[0] > 0 && st->esc_param[0] < FB_HEIGHT_CHAR) {
+        cy = st->esc_param[0] - 1;
+    }
 }
 
 int map_one(int i) {
