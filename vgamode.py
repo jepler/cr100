@@ -112,9 +112,9 @@ activeporch:
 
     print(f"""
 % c-sdk {{
-static inline void {program_name_base}_program_init(PIO pio, uint sm, uint offset, uint pin) {{
+static inline void {program_name_base}_hsync_program_init(PIO pio, uint sm, uint offset, uint pin) {{
 
-    pio_sm_config c = {program_name_base}_program_get_default_config(offset);
+    pio_sm_config c = {program_name_base}_hsync_program_get_default_config(offset);
 
     // Map the state machine's SET pin group to one pin, namely the `pin`
     // parameter to this function.
@@ -196,7 +196,7 @@ static inline void {program_name_base}_vsync_program_init(PIO pio, uint sm, uint
     // sm_config_set_sideset(&c, 1, true, false);
     sm_config_set_sideset_pins(&c, pin);
     sm_config_set_sideset(&c, 2, true, false);
-    sm_config_set_clkdiv_int_frac(&c, {cycles_per_pixel});
+    sm_config_set_clkdiv_int_frac(&c, {cycles_per_pixel}, 0);
 
     // Set this pin's GPIO function (connect PIO to the pad)
     pio_gpio_init(pio, pin);
@@ -227,7 +227,7 @@ def print_pio_pixel_program(program_name_base, mode, out_instr, cycles_per_pixel
     net_khz = cycles_per_pixel * mode.pixel_clock_khz
     assert cycles_per_pixel >= 2
     print(f"""
-.program {program_name_base}_pixels
+.program {program_name_base}_pixel
 ; Pixel generator program for {mode}
 ; PIO clock frequency = {cycles_per_pixel}×{mode.pixel_clock_khz}khz = {net_khz}
     pull block                  ; Pull from FIFO to OSR (only once)
@@ -249,9 +249,9 @@ colorout:
 % c-sdk {{
     enum {{ {program_name_base}_pixel_clock_khz = {mode.pixel_clock_khz}, {program_name_base}_sys_clock_khz = {cycles_per_pixel * mode.pixel_clock_khz} }};
 
-static inline void {program_name_base}_program_init(PIO pio, uint sm, uint offset, uint pin, uint n_pin) {{
+static inline void {program_name_base}_pixel_program_init(PIO pio, uint sm, uint offset, uint pin, uint n_pin) {{
 
-    pio_sm_config c = {program_name_base}_program_get_default_config(offset);
+    pio_sm_config c = {program_name_base}_pixel_program_get_default_config(offset);
 
     // Map the state machine's OUT & SET pins
     sm_config_set_out_pins(&c, pin, n_pin);
@@ -289,7 +289,7 @@ if 1:
     print(mode_vga_720x400, 6*mode_vga_720x400.pixel_clock_khz)
     print(mode_vga_660x400, 6*mode_vga_660x400.pixel_clock_khz)
 
-def print_all(mode, h_divisor=2, out_instr="out pins, 2", cycles_per_pixel=6, file=sys.stdout):
+def print_all(mode, h_divisor=1, out_instr="out pins, 2", cycles_per_pixel=6, file=sys.stdout):
     program_name = f"vga_{mode.visible_width}x{mode.visible_height}_{mode.frame_rate_hz:.0f}"
     print_pio_hsync_program(program_name, mode, h_divisor, cycles_per_pixel, file=file)
     print("\n\n\n", file=file)
