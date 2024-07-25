@@ -100,7 +100,22 @@ void setattr(int cx, int cy, int attr) {
     uint16_t *chardata = (void*)chardata32;
     int i = cx + cy * FB_WIDTH_CHAR;
     chardata[i] = (chardata[i] & 0xff) | attr;
-printf("setattr %d %d -> %d [%04x]\n", cx, cy, attr, chardata[i]);
+}
+
+void scroll_terminal() {
+
+    memmove(chardata32, chardata32 + FB_WIDTH_CHAR / 2, FB_WIDTH_CHAR * (FB_HEIGHT_CHAR - 1) * 2);
+    uint32_t mask = attr | (attr << 16);
+    for(size_t i=0; i<FB_WIDTH_CHAR / 2; i++) {
+        chardata32[(FB_HEIGHT_CHAR-1) * FB_WIDTH_CHAR / 2 + i] = mask;
+    }
+}
+void increase_y() {
+    cy = (cy + 1);
+    if (cy == FB_HEIGHT_CHAR) {
+        scroll_terminal();
+        cy = FB_HEIGHT_CHAR - 1;
+    }
 }
 
 int writefn(void *cookie, const char *data, int n) {
@@ -111,13 +126,13 @@ int writefn(void *cookie, const char *data, int n) {
                 cx = 0;
                 break;
             case '\n':
-                cy = (cy + 1) % FB_HEIGHT_CHAR;
+                increase_y();
                 break;
             default:
                 if(*data >= 32) {
                     if(cx == FB_WIDTH_CHAR) {
-                        cy = (cy + 1) % FB_HEIGHT_CHAR;
                         cx = 0;
+                        increase_y();
                     }
                     chardata[cx + cy * FB_WIDTH_CHAR] = *data | attr;
                     cx ++;
@@ -308,7 +323,6 @@ int main() {
         scrnprintf("\r\n");
     }
 
-    printf("setup_vga()\n");
     multicore_launch_core1(core1_entry);
     attr = 0x300;
     show_cursor();
@@ -327,7 +341,7 @@ int main() {
 
             case PRINTABLE:
                 scrnprintf("%c", c);
-                if(c == '\r')
+                if(0 && c == '\r')
                     scrnprintf("\n");
                 break;
 
