@@ -1,18 +1,12 @@
 #define _GNU_SOURCE
 #include <stdint.h>
 
-#if __has_include("pico/platform.h")
 #include "pico/platform.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "vga_660x480_60.pio.h"
 
 int pixels_sm;
-#else
-#define STANDALONE (1)
-#define __not_in_flash_func(x) x
-#define count_of(a) (sizeof(a)/sizeof((a)[0]))
-#endif
 
 /*
 RAM usage (5x9 font, 2bpp, 132x53 -> 660x480):
@@ -32,18 +26,10 @@ xxxxAABBCCDDEExx
 convert character row to line buffer:
 */
 
-#if STANDALONE
-#define OUT_ARG_COMMA uint32_t * restrict vptr32,
-#define WRITE_PIXDATA \
-    (*vptr32++ = pixels)
-#define FIFO_WAIT do { /* NOTHING */ } while(0)
-#else
-#define OUT_ARG_COMMA
 #define WRITE_PIXDATA \
     (pio0->txf[0] = pixels)
 #define FIFO_WAIT \
     do { /* NOTHING */ }  while(pio_sm_get_tx_fifo_level(pio0, 0) > 2)
-#endif
 
 // shade = array 0x0000, 0x5555, 0xaaaa, 0xffff
 // each loop generates 5(10) pixels so our time budget is 25 (/ 30 / 35 / 40 OC) (50etc)
@@ -53,7 +39,7 @@ convert character row to line buffer:
 #define CHAR_X (5)
 #define CHAR_Y (9)
 #define FB_HEIGHT_PIXEL (FB_HEIGHT_CHAR * CHAR_Y)
-void __not_in_flash_func(scan_convert)(const uint32_t * restrict cptr32, OUT_ARG_COMMA const uint16_t * restrict cgptr, const uint16_t * restrict shade) {
+void __not_in_flash_func(scan_convert)(const uint32_t * restrict cptr32, const uint16_t * restrict cgptr, const uint16_t * restrict shade) {
 #define READ_CHARDATA \
     (ch = *cptr32++)
 #define ONE_CHAR(in_shift, op, out_shift) \
@@ -103,48 +89,6 @@ void __not_in_flash_func(scan_convert)(const uint32_t * restrict cptr32, OUT_ARG
 #include <stdarg.h>
 #include <stdlib.h>
 
-#if STANDALONE
-void scan_to_pbmascii(const uint32_t *vram) {
-    for(int i=0; i<FB_WIDTH_CHAR / 3; i++) {
-        uint32_t v = vram[i];
-if (i < 8)
-    fprintf(stderr, "%08x ", v);
-        for(int j=0; j<CHAR_X * 3; j++) {
-            if(i || j) printf(" ");
-            printf("%d", (v >> 30) & 3);
-            v <<= 2;
-        }
-    }
-fprintf(stderr, "\n");
-    printf("\n");
-}
-#endif
-
-
-#define BIT_TAKE_DEPOSIT(b, from, to) ((((b) >> from) & 1) << to)
-#define CSWIZZLE(b) ( \
-    BIT_TAKE_DEPOSIT((b), 0, 2) | \
-    BIT_TAKE_DEPOSIT((b), 0, 3) | \
-    BIT_TAKE_DEPOSIT((b), 1, 4) | \
-    BIT_TAKE_DEPOSIT((b), 1, 5) | \
-    BIT_TAKE_DEPOSIT((b), 2, 6) | \
-    BIT_TAKE_DEPOSIT((b), 2, 7) | \
-    BIT_TAKE_DEPOSIT((b), 3, 8) | \
-    BIT_TAKE_DEPOSIT((b), 3, 9) | \
-    BIT_TAKE_DEPOSIT((b), 4, 10) | \
-    BIT_TAKE_DEPOSIT((b), 4, 11) | \
-    0 )
-#define CHAR(i, r1, r2, r3, r4, r5, r6, r7, r8, r9) \
-    [i+0*256] = CSWIZZLE(r1), \
-    [i+1*256] = CSWIZZLE(r2), \
-    [i+2*256] = CSWIZZLE(r3), \
-    [i+3*256] = CSWIZZLE(r4), \
-    [i+4*256] = CSWIZZLE(r5), \
-    [i+5*256] = CSWIZZLE(r6), \
-    [i+6*256] = CSWIZZLE(r7), \
-    [i+7*256] = CSWIZZLE(r8), \
-    [i+8*256] = CSWIZZLE(r9) \
-
 uint16_t chargen[256*CHAR_Y] = {
 #include "5x9.h"
 };
@@ -152,8 +96,29 @@ uint16_t chargen[256*CHAR_Y] = {
 int cx, cy, attr = 0x300;
 
 _Static_assert(FB_WIDTH_CHAR % 6 == 0);
-uint32_t chardata32[FB_WIDTH_CHAR * FB_HEIGHT_CHAR / 2] = {
-};
+uint32_t chardata32[FB_WIDTH_CHAR * FB_HEIGHT_CHAR / 2];
+
+int readchar(int cx, int cy) {
+    uint16_t *chardata = (void*)chardata32;
+    int i = cx + cy * FB_WIDTH_CHAR;
+    return chardata[i] & 0xff;
+}
+int readattr(int cx, int cy) {
+    uint16_t *chardata = (void*)chardata32;
+    int i = cx + cy * FB_WIDTH_CHAR;
+    return chardata[i] & 0xff00;
+}
+
+void setchar(int cx, int cy, int ch) {
+    uint16_t *chardata = (void*)chardata32;
+    int i = cx + cy * FB_WIDTH_CHAR;
+    chardata[i] = (chardata[i] & 0xff00) | ch;
+}
+void setattr(int cx, int cy, int attr) {
+    uint16_t *chardata = (void*)chardata32;
+    int i = cx + cy * FB_WIDTH_CHAR;
+    chardata[i] = (chardata[i] & 0xff) | attr;
+}
 
 int writefn(void *cookie, const char *data, int n) {
     uint16_t *chardata = cookie;
@@ -212,9 +177,9 @@ static void setup_vga_vsync(PIO pio) {
 }
 
 static int setup_vga_pixels(PIO pio) {
-    uint offset = pio_add_program(pio, &vga_660x480_60_pixels_program);
+    uint offset = pio_add_program(pio, &vga_660x480_60_pixel_program);
     uint sm = pio_claim_unused_sm(pio, true);
-    vga_660x480_60_pixels_program_init(pio, sm, offset, G0_PIN, 2);
+    vga_660x480_60_pixel_program_init(pio, sm, offset, G0_PIN, 2);
     pio_sm_put_blocking(pio, sm, 660-1);
     return sm;
 }
@@ -260,50 +225,48 @@ void __not_in_flash_func(core1_entry)() {
 }
 #endif
 
+#define BG_ATTR(x) ((x) << 11)
+#define FG_ATTR(x) ((x) << 8)
+
+int saved_attr;
+void hide_cursor() {
+    int xx = cx == FB_WIDTH_CHAR ? FB_WIDTH_CHAR - 1 : cx;
+    saved_attr = readattr(xx, cy);
+    setattr(xx, cy, saved_attr ^ BG_ATTR(7));
+}
+
+void show_cursor() {
+    int xx = cx == FB_WIDTH_CHAR ? FB_WIDTH_CHAR - 1 : cx;
+    setattr(xx, cy, saved_attr);
+}
+
 
 int main() {
 #if !STANDALONE
     set_sys_clock_khz(vga_660x480_60_sys_clock_khz, false);
     stdio_init_all();
 #endif
-    if(0)
-        for (size_t i=0; i<count_of(chardata32); i++) { chardata32[i] = 0x08000800; }
-
-    attr = 0x300;
 
     scrnprintf(
-"An overclock to 140MHz is also very stable if you wanted 720 pixels Some classic text modes could\r\n"
-"double the rightmost pixel of the 8-bit-wide font (typically, if the high bit of the character\r\n"
-"number was set) instead of outputting 0, so you could get block graphics but they would be\r\n"
-"slightly distorted worst with the \"shade\" characters but fine with almost everything else\n\r\n\r\n");
+"\r\n"
+"CR100 terminal demo...\r\n"
+);
 
-    for (int x = 0; x < 0x4000; x += 0x100) {
-        attr = x;
-        scrnprintf("01234567890 wasd il -uwu_", FB_WIDTH_CHAR, FB_HEIGHT_CHAR, CHAR_X, CHAR_Y);
-        scrnprintf("AA BB AB BA gqgq ", FB_WIDTH_CHAR, FB_HEIGHT_CHAR, CHAR_X, CHAR_Y);
-    }
-
-#if STANDALONE
-    uint32_t row32[FB_WIDTH_CHAR / 3];
-    printf("P2 %d %d 3\n", FB_WIDTH_CHAR * CHAR_X, FB_HEIGHT_CHAR * CHAR_Y);
-    for(int i=0; i<FB_HEIGHT_CHAR; i++) {
-        for(int j=0; j<CHAR_Y; j++) {
-            scan_convert(&chardata32[FB_WIDTH_CHAR * i / 2], row32,
-                &chargen[256 * j], base_shade);
-            scan_to_pbmascii(row32);
-        }
-    }
-#endif
-
-#if !STANDALONE
     printf("setup_vga()\n");
     setup_vga();
     multicore_launch_core1(core1_entry);
     attr = 0x300;
+    show_cursor();
     while (true) {
-        scrnprintf("%c", "AB " [random() % 3]);
+        int c = getchar();
+        if (c != EOF) {
+            hide_cursor();
+            if(c == '\n')
+                scrnprintf("\r");
+            scrnprintf("%c", c);
+            show_cursor();
+        }
     }
-#endif
 
     return 0;
 }
