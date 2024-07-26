@@ -261,16 +261,20 @@ void invert_screen() {
     for(size_t i=0; i<count_of(chardata32); i++) { chardata32[i] ^= 0x18001800; }
 }
 
-void clear_eol() {
+void clear_eol(int ps) {
+    size_t start = cx + cy * FB_WIDTH_CHAR, end = (cx+1) * FB_WIDTH_CHAR;
+    if(ps == 1) { end = start+1; }
+    if(ps > 0) { start = cy * FB_WIDTH_CHAR; }
     uint16_t *chardata = (void*)chardata32;
-    for(int x = cx; x < FB_WIDTH_CHAR; x++) {
-        chardata[cx + cy * FB_WIDTH_CHAR] = 32 | attr;
-    }
+    for(size_t i = start; i< end; i++) { chardata[i] = 32 | attr; }
 }
 
-void clear_screen() {
-    uint32_t x = (32 | attr) | ((32 | attr) << 16);
-    for(size_t i=0; i<count_of(chardata32); i++) { chardata32[i] = x; }
+void clear_screen(int ps) {
+    size_t start = cx + cy * FB_WIDTH_CHAR, end = FB_HEIGHT_CHAR * FB_WIDTH_CHAR;
+    if(ps == 1) { end = start+1; }
+    if(ps > 0) { start = 0; }
+    uint16_t *chardata = (void*)chardata32;
+    for(size_t i = start; i< end; i++) { chardata[i] = 32 | attr; }
 }
 
 void cursor_left() {
@@ -356,11 +360,11 @@ int main() {
                 break;
 
             case CLEAR_EOL:
-                clear_eol();
+                clear_eol(vt_st.esc_param[0]);
                 break;
 
             case CLEAR_SCREEN:
-                clear_screen();
+                clear_screen(vt_st.esc_param[0]);
                 break;
 
             case CURSOR_LEFT:
