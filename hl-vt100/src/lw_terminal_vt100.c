@@ -290,6 +290,136 @@ static void RM(struct lw_terminal *term_emul)
 }
 
 /*
+  SGR - Character attributes
+
+  ESC [ Pm m
+
+  Invoke the graphic rendition specified by the parameter(s). All
+  following characters transmitted to the VT100 are rendered according
+  to the parameter(s) until the next occurrence of SGR.
+
+  [list from urxvt(7); x marks "implemented here"]
+
+x Pm = 0             Normal (default)
+x Pm = 1 / 21        On / Off Bold (bright fg)
+  Pm = 3 / 23        On / Off Italic
+  Pm = 4 / 24        On / Off Underline
+x Pm = 5 / 25        On / Off Slow Blink (bright bg)
+x Pm = 6 / 26        On / Off Rapid Blink (bright bg)
+
+x Pm = 7 / 27        On / Off Inverse
+  Pm = 8 / 27        On / Off Invisible
+x Pm = 30 / 40       fg/bg Black
+x Pm = 31 / 41       fg/bg Red
+x Pm = 32 / 42       fg/bg Green
+x Pm = 33 / 43       fg/bg Yellow
+x Pm = 34 / 44       fg/bg Blue
+x Pm = 35 / 45       fg/bg Magenta
+x Pm = 36 / 46       fg/bg Cyan
+x Pm = 37 / 47       fg/bg White
+  Pm = 38;5 / 48;5   set fg/bg to colour #m (ISO 8613-6)
+  Pm = 38;2;R;G;B    set fg to 24-bit colour #RGB (ISO 8613-3)
+  Pm = 48;2;R;G;B    set bg to 24-bit colour #RGB (ISO 8613-3)
+x Pm = 39 / 49       fg/bg Default
+x Pm = 90 / 100      fg/bg Bright Black
+x Pm = 91 / 101      fg/bg Bright Red
+x Pm = 92 / 102      fg/bg Bright Green
+x Pm = 93 / 103      fg/bg Bright Yellow
+x Pm = 94 / 104      fg/bg Bright Blue
+x Pm = 95 / 105      fg/bg Bright Magenta
+x Pm = 96 / 106      fg/bg Bright Cyan
+x Pm = 97 / 107      fg/bg Bright White
+x Pm = 99 / 109      fg/bg Bright Default
+*/
+
+static lw_cell_t default_encode_attr(void *user_data, const struct lw_parsed_attr *attr) {
+    (void)user_data;
+
+    lw_cell_t result;
+    if (attr->inverse) {
+        result = attr->bg;
+        result |= attr->fg << 4;
+    } else {
+        result = attr->fg;
+        result |= attr->bg << 4;
+    }
+    if (attr->bold) result ^= 0x08;
+    if (attr->blink) result ^= 0x80;
+
+    return result << 8;
+}
+
+static void SGR(struct lw_terminal *term_emul)
+{
+    struct lw_terminal_vt100 *vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
+
+    if (term_emul->argc == 0) {
+        term_emul->argc = 1;
+        term_emul->argv[0] = 0;
+    }
+
+    for (unsigned int i=0; i<term_emul->argc; i++) {
+        int p = term_emul->argv[i];
+        switch(p) {
+            case 0:
+                vt100->parsed_attr = LW_DEFAULT_ATTR;
+            break;
+
+        case 1:
+            vt100->parsed_attr.bold = true;
+            break;
+
+        case 21:
+            vt100->parsed_attr.bold = false;
+            break;
+
+        case 5:
+        case 6:
+            vt100->parsed_attr.blink = true;
+            break;
+
+        case 25:
+        case 26:
+            vt100->parsed_attr.blink = false;
+            break;
+
+        case 7:
+            vt100->parsed_attr.inverse = true;
+            break;
+
+        case 27:
+            vt100->parsed_attr.inverse = false;
+            break;
+
+        case 39:
+            vt100->parsed_attr.fg = 7;
+            break;
+
+        case 49:
+            vt100->parsed_attr.bg = 0;
+            break;
+
+        case 30 ... 37:
+            vt100->parsed_attr.fg = p - 30;
+            break;
+
+        case 40 ... 47:
+            vt100->parsed_attr.bg = p - 40;
+            break;
+
+        case 90 ... 97:
+            vt100->parsed_attr.fg = p - 30 + 8;
+            break;
+
+        case 100 ... 107:
+            vt100->parsed_attr.fg = p - 30 + 8;
+            break;
+        }
+    }
+    vt100->attr = vt100->encode_attr(vt100, &vt100->parsed_attr);
+}
+
+/*
   CUP – Cursor Position
 
   ESC [ Pn ; Pn H        default value: 1
@@ -427,36 +557,6 @@ static void DECSTBM(struct lw_terminal *term_emul)
     vt100->margin_top = margin_top;
     term_emul->argc = 0;
     CUP(term_emul);
-}
-
-/*
-  SGR – Select Graphic Rendition
-
-  ESC [ Ps ; . . . ; Ps m
-
-  Invoke the graphic rendition specified by the parameter(s). All
-  following characters transmitted to the VT100 are rendered according
-  to the parameter(s) until the next occurrence of SGR. Format Effector
-
-  Parameter    Parameter Meaning
-  0            Attributes off
-  1            Bold or increased intensity
-  4            Underscore
-  5            Blink
-  7            Negative (reverse) image
-
-  All other parameter values are ignored.
-
-  With the Advanced Video Option, only one type of character attribute
-  is possible as determined by the cursor selection; in that case
-  specifying either the underscore or the reverse attribute will
-  activate the currently selected attribute. (See cursor selection in
-  Chapter 1).
-*/
-static void SGR(struct lw_terminal *term_emul)
-{
-    term_emul = term_emul;
-    /* Just ignore them for now, we are rendering pure text only */
 }
 
 /*
@@ -944,6 +1044,7 @@ static void setcells(lw_cell_t *buf, lw_cell_t c, size_t n) {
 
 struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
                                      void (*unimplemented)(struct lw_terminal* term_emul, char *seq, char chr),
+                                     lw_cell_t (*encode_attr)(void *user_data, const struct lw_parsed_attr *attr),
                                      unsigned int width, unsigned int height)
 {
     struct lw_terminal_vt100 *this;
@@ -1001,6 +1102,8 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
     this->lw_terminal->callbacks.esc.n7 = DECSC;
     this->lw_terminal->callbacks.hash.n8 = DECALN;
     this->lw_terminal->unimplemented = unimplemented;
+    this->encode_attr = encode_attr ? encode_attr : default_encode_attr;
+    lw_terminal_vt100_read_str(this, "\033[m"); // set default attributes
     return this;
 free_tabulations:
     free(this->tabulations);

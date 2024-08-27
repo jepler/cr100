@@ -27,6 +27,7 @@
 #define __LW_TERMINAL_VT100_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "lw_terminal_parser.h"
 
@@ -67,6 +68,13 @@
 
 typedef uint16_t lw_cell_t;
 
+struct lw_parsed_attr {
+    uint8_t fg, bg;
+    bool blink, bold, inverse;
+};
+
+#define LW_DEFAULT_ATTR ((struct lw_parsed_attr) { 7, 0, false, false, false })
+
 /*
 ** frozen_screen is the frozen part of the screen
 ** when margins are set.
@@ -90,15 +98,19 @@ struct lw_terminal_vt100
     char         *tabulations;
     unsigned int selected_charset;
     unsigned int modes;
+    struct lw_parsed_attr parsed_attr;
     lw_cell_t    attr, saved_cell;
     const lw_cell_t    *alines[80];
     void         (*master_write)(void *user_data, void *buffer, size_t len);
+    lw_cell_t    (*encode_attr)(void *user_data, const struct lw_parsed_attr *attr);
     void         *user_data;
 };
 
 struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
                                      void (*unimplemented)(struct lw_terminal* term_emul,
                                                            char *seq, char chr),
+                                     lw_cell_t (*encode_attr)(void *user_data,
+                                                         const struct lw_parsed_attr *attr),
                                      unsigned int width, unsigned int height);
 char lw_terminal_vt100_get(struct lw_terminal_vt100 *vt100, unsigned int x, unsigned int y);
 const lw_cell_t *lw_terminal_vt100_getline(struct lw_terminal_vt100 *vt100, unsigned y);
