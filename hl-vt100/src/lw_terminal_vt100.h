@@ -84,6 +84,7 @@ struct lw_parsed_attr {
 struct lw_terminal_vt100
 {
     struct lw_terminal *lw_terminal;
+    int ustate, ubits;
     unsigned int width;
     unsigned int height;
     unsigned int x;
