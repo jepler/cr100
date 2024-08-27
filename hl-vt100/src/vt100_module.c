@@ -77,6 +77,40 @@ VT100_fork(VT100Object *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+PyDoc_STRVAR(vt100_headless_getattrlines_doc,
+"getattrlines()\n\
+\n\
+Get a list of lines (with attributes) as currently seen by the emulator.");
+
+static PyObject *
+VT100_getattrlines(VT100Object *self, PyObject *Py_UNUSED(ignored))
+{
+    const lw_cell_t **lines;
+    PyObject *result;
+
+    lines = vt100_headless_getlines(self->obj);
+    result = PyList_New(0);
+    if (result == NULL)
+        return NULL;
+    for (unsigned int i = 0; i < self->obj->term->height; i++) {
+        PyObject *row = PyList_New(0);
+        if (row == NULL) {
+            Py_XDECREF(result);
+            return NULL;
+        }
+        PyList_Append(result, row);
+        for (unsigned int j = 0; j < self->obj->term->width; j++) {
+            PyObject *value = PyLong_FromLong(lines[i][j]);
+            if (!value) {
+                Py_XDECREF(result);
+                return NULL;
+            }
+            PyList_Append(row, value);
+        }
+    }
+    return result;
+}
+
 PyDoc_STRVAR(vt100_headless_getlines_doc,
 "getlines()\n\
 \n\
@@ -85,15 +119,24 @@ Get a list of lines as currently seen by the emulator.");
 static PyObject *
 VT100_getlines(VT100Object *self, PyObject *Py_UNUSED(ignored))
 {
-    const char **lines;
+    const lw_cell_t **lines;
     PyObject *result;
 
     lines = vt100_headless_getlines(self->obj);
     result = PyList_New(0);
     if (result == NULL)
         return NULL;
-    for (unsigned int i = 0; i < self->obj->term->height; i++)
-        PyList_Append(result, PyUnicode_FromStringAndSize(lines[i], self->obj->term->width));
+    for (unsigned int i = 0; i < self->obj->term->height; i++) {
+        PyObject *row = PyUnicode_New(self->obj->term->width, 255);
+        if (row == NULL) {
+            Py_XDECREF(result);
+            return NULL;
+        }
+        for (unsigned int j = 0; j < self->obj->term->width; j++) {
+            PyUnicode_WriteChar(row, j, lines[i][j] & 0xff);
+        }
+        PyList_Append(result, row);
+    }
     return result;
 }
 
@@ -223,6 +266,7 @@ VT100_dealloc(VT100Object *self)
 static PyMethodDef VT100_methods[] = {
     {"fork",            (PyCFunction)VT100_fork,  METH_VARARGS, vt100_headless_fork_doc},
     {"getlines",        (PyCFunction)VT100_getlines,  METH_NOARGS, vt100_headless_getlines_doc},
+    {"getattrlines",        (PyCFunction)VT100_getattrlines,  METH_NOARGS, vt100_headless_getattrlines_doc},
     {"main_loop",        (PyCFunction)VT100_main_loop,  METH_NOARGS, vt100_headless_main_loop_doc},
     {"stop",        (PyCFunction)VT100_stop,  METH_NOARGS, vt100_headless_stop_doc},
     {NULL,              NULL}           /* sentinel */

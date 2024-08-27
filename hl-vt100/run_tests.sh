@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Copyright (c) 2016 Julien Palard.
 # All rights reserved.
@@ -22,19 +22,12 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+set -eo pipefail
 
 if [ "$1" = python ]
 then
     python -m pip install .
-    cat <<EOF | python
-import hl_vt100
-
-print("Starting python test...")
-vt100 = hl_vt100.vt100_headless()
-vt100.fork('/usr/bin/top', ['/usr/bin/top', '-n', '1'])
-vt100.main_loop()
-print(*vt100.getlines(), sep="\n")
-EOF
+    python vt_test.py
     exit
 fi
 
