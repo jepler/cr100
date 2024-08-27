@@ -134,7 +134,7 @@ void master_write(void *user_data, void *buffer, size_t len)
     write(this->master, buffer, len);
 }
 
-const char **vt100_headless_getlines(struct vt100_headless *this)
+const lw_cell_t **vt100_headless_getlines(struct vt100_headless *this)
 {
     return lw_terminal_vt100_getlines(this->term);
 }
@@ -159,7 +159,7 @@ void vt100_headless_fork(struct vt100_headless *this,
     }
     else
     {
-        this->term = lw_terminal_vt100_init(this, lw_terminal_parser_default_unimplemented);
+        this->term = lw_terminal_vt100_init(this, lw_terminal_parser_default_unimplemented, winsize.ws_col, winsize.ws_row);
         this->term->master_write = master_write;
         ioctl(this->master, TIOCSWINSZ, &winsize);
     }

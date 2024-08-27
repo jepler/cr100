@@ -47,5 +47,5 @@ then
     exit
 fi
 
-$0 python
-$0 c
+bash $0 python
+bash $0 c

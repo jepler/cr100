@@ -33,15 +33,17 @@
 
 void disp(struct vt100_headless *vt100)
 {
-    unsigned int y;
-    const char **lines;
+    unsigned int x, y;
+    const lw_cell_t **lines;
 
     lines = vt100_headless_getlines(vt100);
     write(1, "\n", 1);
     for (y = 0; y < vt100->term->height; ++y)
     {
         write(1, "|", 1);
-        write(1, lines[y], vt100->term->width);
+        for (x = 0; x < vt100->term->width; x++) {
+            write(1, &lines[y][x], 1);
+        }
         write(1, "|\n", 2);
     }
 }

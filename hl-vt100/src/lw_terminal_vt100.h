@@ -26,7 +26,8 @@
 #ifndef __LW_TERMINAL_VT100_H__
 #define __LW_TERMINAL_VT100_H__
 
-#include <pthread.h>
+#include <stdint.h>
+
 #include "lw_terminal_parser.h"
 
 /*
@@ -64,6 +65,8 @@
 #define UNSET_MODE(vt100, mode) ((vt100)->modes &= ~get_mode_mask(mode))
 #define MODE_IS_SET(vt100, mode) ((vt100)->modes & get_mode_mask(mode))
 
+typedef uint16_t lw_cell_t;
+
 /*
 ** frozen_screen is the frozen part of the screen
 ** when margins are set.
@@ -82,22 +85,24 @@ struct lw_terminal_vt100
     unsigned int margin_top;
     unsigned int margin_bottom;
     unsigned int top_line; /* Line at the top of the display */
-    char         *screen;
-    char         *frozen_screen;
+    lw_cell_t    *ascreen;
+    lw_cell_t    *afrozen_screen;
     char         *tabulations;
     unsigned int selected_charset;
     unsigned int modes;
-    char         *lines[80];
+    lw_cell_t    attr, saved_cell;
+    const lw_cell_t    *alines[80];
     void         (*master_write)(void *user_data, void *buffer, size_t len);
     void         *user_data;
-    pthread_mutex_t mutex;
 };
 
 struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
                                      void (*unimplemented)(struct lw_terminal* term_emul,
-                                                           char *seq, char chr));
+                                                           char *seq, char chr),
+                                     unsigned int width, unsigned int height);
 char lw_terminal_vt100_get(struct lw_terminal_vt100 *vt100, unsigned int x, unsigned int y);
-const char **lw_terminal_vt100_getlines(struct lw_terminal_vt100 *vt100);
+const lw_cell_t *lw_terminal_vt100_getline(struct lw_terminal_vt100 *vt100, unsigned y);
+const lw_cell_t **lw_terminal_vt100_getlines(struct lw_terminal_vt100 *vt100);
 void lw_terminal_vt100_destroy(struct lw_terminal_vt100 *this);
 void lw_terminal_vt100_read_str(struct lw_terminal_vt100 *this, char *buffer);
 

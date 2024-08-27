@@ -4,3 +4,4 @@ parser
 *.egg-info/
 .venv/
 .envrc
+test
