@@ -8,8 +8,6 @@ print(*vt100.getlines(), sep="\n")
 
 
 print()
-print(vt100.getattrlines())
-print()
 for a in vt100.getattrlines():
     s = " ".join(f"{c >> 8:02x}" for c in a[:20])
     print(s)

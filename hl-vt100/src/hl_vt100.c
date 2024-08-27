@@ -24,6 +24,7 @@
  */
 
 #define _XOPEN_SOURCE
+#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -111,6 +112,9 @@ int vt100_headless_main_loop(struct vt100_headless *this)
             read_size = read(this->master, &buffer, 4096);
             if (read_size == -1)
             {
+                if (errno == EIO) {
+                    return EXIT_SUCCESS;
+                }
                 perror("read");
                 return EXIT_FAILURE;
             }
