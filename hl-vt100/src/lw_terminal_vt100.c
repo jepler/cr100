@@ -1058,11 +1058,9 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
     this->ascreen = malloc(132 * SCROLLBACK * this->height * sizeof(lw_cell_t));
     if (this->ascreen == NULL)
         goto free_this;
-    setcells(this->ascreen, ' ', 132 * SCROLLBACK * this->height);
     this->afrozen_screen = malloc(132 * this->height * sizeof(lw_cell_t));
     if (this->afrozen_screen == NULL)
         goto free_screen;
-    setcells(this->afrozen_screen, ' ', 132 * this->height);
     this->tabulations = malloc(132);
     if (this->tabulations == NULL)
         goto free_frozen_screen;
@@ -1104,6 +1102,8 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
     this->lw_terminal->unimplemented = unimplemented;
     this->encode_attr = encode_attr ? encode_attr : default_encode_attr;
     lw_terminal_vt100_read_str(this, "\033[m"); // set default attributes
+    setcells(this->ascreen, ' ' | this->attr, 132 * SCROLLBACK * this->height);
+    setcells(this->afrozen_screen, ' ' | this->attr, 132 * this->height);
     return this;
 free_tabulations:
     free(this->tabulations);
