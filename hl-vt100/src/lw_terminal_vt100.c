@@ -184,37 +184,51 @@ static unsigned int get_mode_mask(unsigned int mode)
     ((x + vt100->width * y)                         \
      % (vt100->width * SCROLLBACK * vt100->height))
 
-static void set(struct lw_terminal_vt100 *headless_term,
-                unsigned int x, unsigned int y,
-                char c)
+static lw_cell_t aget(struct lw_terminal_vt100 *headless_term,
+                unsigned int x, unsigned int y)
 {
     if (y < headless_term->margin_top || y > headless_term->margin_bottom)
-        headless_term->frozen_screen[FROZEN_SCREEN_PTR(headless_term, x, y)] = c;
+        return headless_term->afrozen_screen[FROZEN_SCREEN_PTR(headless_term, x, y)];
     else
-        headless_term->screen[SCREEN_PTR(headless_term, x, y)] = c;
+        return headless_term->ascreen[SCREEN_PTR(headless_term, x, y)];
 }
 
+static void aset(struct lw_terminal_vt100 *headless_term,
+                unsigned int x, unsigned int y,
+                lw_cell_t c)
+{
+    if (y < headless_term->margin_top || y > headless_term->margin_bottom)
+        headless_term->afrozen_screen[FROZEN_SCREEN_PTR(headless_term, x, y)] = c | headless_term->attr;
+    else
+        headless_term->ascreen[SCREEN_PTR(headless_term, x, y)] = c | headless_term->attr;
+}
 
-char lw_terminal_vt100_get(struct lw_terminal_vt100 *vt100, unsigned int x, unsigned int y)
+static void set(struct lw_terminal_vt100 *headless_term,        
+                unsigned int x, unsigned int y,
+                char c) {
+    aset( headless_term, x, y, (unsigned char)c | headless_term->attr);
+}
+
+lw_cell_t lw_terminal_vt100_aget(struct lw_terminal_vt100 *vt100, unsigned int x, unsigned int y)
 {
     if (y < vt100->margin_top || y > vt100->margin_bottom)
-        return vt100->frozen_screen[FROZEN_SCREEN_PTR(vt100, x, y)];
+        return vt100->afrozen_screen[FROZEN_SCREEN_PTR(vt100, x, y)];
     else
-        return vt100->screen[SCREEN_PTR(vt100, x, y)];
+        return vt100->ascreen[SCREEN_PTR(vt100, x, y)];
 }
 
 static void froze_line(struct lw_terminal_vt100 *vt100, unsigned int y)
 {
-    memcpy(vt100->frozen_screen + vt100->width * y,
-           vt100->screen + SCREEN_PTR(vt100, 0, y),
-           vt100->width);
+    memcpy(vt100->afrozen_screen + vt100->width * y,
+           vt100->ascreen + SCREEN_PTR(vt100, 0, y),
+           vt100->width * sizeof(lw_cell_t));
 }
 
 static void unfroze_line(struct lw_terminal_vt100 *vt100, unsigned int y)
 {
-    memcpy(vt100->screen + SCREEN_PTR(vt100, 0, y),
-           vt100->frozen_screen + vt100->width * y,
-           vt100->width);
+    memcpy(vt100->ascreen + SCREEN_PTR(vt100, 0, y),
+           vt100->afrozen_screen + vt100->width * y,
+           vt100->width * sizeof(lw_cell_t));
 }
 
 static void blank_screen(struct lw_terminal_vt100 *lw_terminal_vt100)
@@ -908,22 +922,29 @@ static void vt100_write(struct lw_terminal *term_emul, char c)
     vt100->x += 1;
 }
 
-const char **lw_terminal_vt100_getlines(struct lw_terminal_vt100 *vt100)
+const lw_cell_t *lw_terminal_vt100_getline(struct lw_terminal_vt100 *vt100, unsigned int y) {
+    if (y < vt100->margin_top || y > vt100->margin_bottom)
+        return vt100->afrozen_screen + FROZEN_SCREEN_PTR(vt100, 0, y);
+    else
+        return vt100->ascreen + SCREEN_PTR(vt100, 0, y);
+}
+
+const lw_cell_t **lw_terminal_vt100_getlines(struct lw_terminal_vt100 *vt100)
 {
     unsigned int y;
 
-    pthread_mutex_lock(&vt100->mutex);
     for (y = 0; y < vt100->height; ++y)
-    if (y < vt100->margin_top || y > vt100->margin_bottom)
-        vt100->lines[y] = vt100->frozen_screen + FROZEN_SCREEN_PTR(vt100, 0, y);
-    else
-        vt100->lines[y] = vt100->screen + SCREEN_PTR(vt100, 0, y);
-    pthread_mutex_unlock(&vt100->mutex);
-    return (const char **)vt100->lines;
+        vt100->alines[y] = lw_terminal_vt100_getline(vt100, y);
+    return vt100->alines;
+}
+
+static void setcells(lw_cell_t *buf, lw_cell_t c, size_t n) {
+    for(;n--;buf++) *buf = c;
 }
 
 struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
-                                     void (*unimplemented)(struct lw_terminal* term_emul, char *seq, char chr))
+                                     void (*unimplemented)(struct lw_terminal* term_emul, char *seq, char chr),
+                                     unsigned int width, unsigned int height)
 {
     struct lw_terminal_vt100 *this;
 
@@ -931,16 +952,16 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
     if (this == NULL)
         return NULL;
     this->user_data = user_data;
-    this->height = 24;
-    this->width = 80;
-    this->screen = malloc(132 * SCROLLBACK * this->height);
-    if (this->screen == NULL)
+    this->height = height;
+    this->width = width;
+    this->ascreen = malloc(132 * SCROLLBACK * this->height * sizeof(lw_cell_t));
+    if (this->ascreen == NULL)
         goto free_this;
-    memset(this->screen, ' ', 132 * SCROLLBACK * this->height);
-    this->frozen_screen = malloc(132 * this->height);
-    if (this->frozen_screen == NULL)
+    setcells(this->ascreen, ' ', 132 * SCROLLBACK * this->height);
+    this->afrozen_screen = malloc(132 * this->height * sizeof(lw_cell_t));
+    if (this->afrozen_screen == NULL)
         goto free_screen;
-    memset(this->frozen_screen, ' ', 132 * this->height);
+    setcells(this->afrozen_screen, ' ', 132 * this->height);
     this->tabulations = malloc(132);
     if (this->tabulations == NULL)
         goto free_frozen_screen;
@@ -984,25 +1005,44 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
 free_tabulations:
     free(this->tabulations);
 free_frozen_screen:
-    free(this->frozen_screen);
+    free(this->afrozen_screen);
 free_screen:
-    free(this->screen);
+    free(this->ascreen);
 free_this:
     free(this);
     return NULL;
 }
 
+#define CURSOR_ATTR (7 << 11) // very specific to cr100
+static void show_cursor(struct lw_terminal_vt100 *this) {
+    unsigned x = this->x, y = this->y;
+    lw_cell_t cell;
+    if(x == this->width)
+        x -= 1;
+    cell = aget(this, x, y);
+    this->saved_cell = cell;
+    aset(this, x, y, cell ^ CURSOR_ATTR);
+}
+
+static void hide_cursor(struct lw_terminal_vt100 *this) {
+    unsigned x = this->x, y = this->y;
+    if(x == this->width)
+        x -= 1;
+    aset(this, x, y, this->saved_cell);
+}
+
 void lw_terminal_vt100_read_str(struct lw_terminal_vt100 *this, char *buffer)
 {
-    pthread_mutex_lock(&this->mutex);
+    hide_cursor(this);
     lw_terminal_parser_read_str(this->lw_terminal, buffer);
-    pthread_mutex_unlock(&this->mutex);
+    show_cursor(this);
 }
 
 void lw_terminal_vt100_destroy(struct lw_terminal_vt100 *this)
 {
     lw_terminal_parser_destroy(this->lw_terminal);
-    free(this->screen);
-    free(this->frozen_screen);
+    free(this->tabulations);
+    free(this->ascreen);
+    free(this->afrozen_screen);
     free(this);
 }
