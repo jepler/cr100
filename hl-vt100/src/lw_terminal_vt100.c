@@ -1017,6 +1017,9 @@ static void vt100_write_unicode(struct lw_terminal *term_emul, int c) {
         else
             vt100->x -= 1;
     }
+    if (vt100->selected_charset && c >= 95 && c < 127) {
+        c = c - 95;
+    }
     set(vt100, vt100->x, vt100->y, c);
     vt100->x += 1;
 }
