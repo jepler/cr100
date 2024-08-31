@@ -97,6 +97,7 @@ struct lw_terminal_vt100
     lw_cell_t    *ascreen;
     lw_cell_t    *afrozen_screen;
     char         *tabulations;
+    bool         unicode;
     unsigned int selected_charset;
     unsigned int modes;
     struct lw_parsed_attr parsed_attr;
