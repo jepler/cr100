@@ -13,7 +13,13 @@ pico_sdk_init()
 
 project(pico-cr100)
 
-add_executable(cr100 chargen.c vt.c)
+add_executable(cr100
+    chargen.c
+    hl-vt100/src/lw_terminal_parser.c
+    hl-vt100/src/lw_terminal_vt100.c
+    )
+
+target_include_directories(cr100 PRIVATE hl-vt100/src)
 
 pico_enable_stdio_usb(cr100 1)
 

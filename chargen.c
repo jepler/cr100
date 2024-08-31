@@ -6,7 +6,7 @@
 #include "pico/multicore.h"
 #include "vga_660x480_60.pio.h"
 
-#include "vt.h"
+#include "lw_terminal_vt100.h"
 
 int pixels_sm;
 
@@ -20,6 +20,8 @@ int pixels_sm;
 #define CHAR_X (5)
 #define CHAR_Y (9)
 #define FB_HEIGHT_PIXEL (FB_HEIGHT_CHAR * CHAR_Y)
+
+struct lw_terminal_vt100 *vt100;
 
 void __not_in_flash_func(scan_convert)(const uint32_t * restrict cptr32, const uint16_t * restrict cgptr, const uint16_t * restrict shade) {
 #define READ_CHARDATA \
@@ -80,65 +82,8 @@ int cx, cy, attr = 0x300;
 _Static_assert(FB_WIDTH_CHAR % 6 == 0);
 uint32_t chardata32[FB_WIDTH_CHAR * FB_HEIGHT_CHAR / 2];
 
-int readchar(int cx, int cy) {
-    uint16_t *chardata = (void*)chardata32;
-    int i = cx + cy * FB_WIDTH_CHAR;
-    return chardata[i] & 0xff;
-}
-int readattr(int cx, int cy) {
-    uint16_t *chardata = (void*)chardata32;
-    int i = cx + cy * FB_WIDTH_CHAR;
-    return chardata[i] & 0xff00;
-}
-
-void setchar(int cx, int cy, int ch) {
-    uint16_t *chardata = (void*)chardata32;
-    int i = cx + cy * FB_WIDTH_CHAR;
-    chardata[i] = (chardata[i] & 0xff00) | ch;
-}
-void setattr(int cx, int cy, int attr) {
-    uint16_t *chardata = (void*)chardata32;
-    int i = cx + cy * FB_WIDTH_CHAR;
-    chardata[i] = (chardata[i] & 0xff) | attr;
-}
-
-void scroll_terminal() {
-
-    memmove(chardata32, chardata32 + FB_WIDTH_CHAR / 2, FB_WIDTH_CHAR * (FB_HEIGHT_CHAR - 1) * 2);
-    uint32_t mask = attr | (attr << 16);
-    for(size_t i=0; i<FB_WIDTH_CHAR / 2; i++) {
-        chardata32[(FB_HEIGHT_CHAR-1) * FB_WIDTH_CHAR / 2 + i] = mask;
-    }
-}
-void increase_y() {
-    cy = (cy + 1);
-    if (cy == FB_HEIGHT_CHAR) {
-        scroll_terminal();
-        cy = FB_HEIGHT_CHAR - 1;
-    }
-}
-
 int writefn(void *cookie, const char *data, int n) {
-    uint16_t *chardata = cookie;
-    for(; n; data++, n--) {
-        switch(*data) {
-            case '\r':
-                cx = 0;
-                break;
-            case '\n':
-                increase_y();
-                break;
-            default:
-                if(*data >= 32) {
-                    if(cx == FB_WIDTH_CHAR) {
-                        cx = 0;
-                        increase_y();
-                    }
-                    chardata[cx + cy * FB_WIDTH_CHAR] = *data | attr;
-                    cx ++;
-                }
-        }
-    }
+    lw_terminal_vt100_read_buf(vt100, data, n);
     return n;
 }
 
@@ -241,74 +186,27 @@ void __not_in_flash_func(core1_entry)() {
 #define BG_ATTR(x) ((x) << 11)
 #define FG_ATTR(x) ((x) << 8)
 
-int saved_attr;
-void show_cursor() {
-    int xx = cx == FB_WIDTH_CHAR ? FB_WIDTH_CHAR - 1 : cx;
-    saved_attr = readattr(xx, cy);
-    setattr(xx, cy, saved_attr ^ BG_ATTR(7));
-}
-
-void hide_cursor() {
-    int xx = cx == FB_WIDTH_CHAR ? FB_WIDTH_CHAR - 1 : cx;
-    setattr(xx, cy, saved_attr);
-}
-
-#define MAKE_ATTR(fg, bg) ((fg) ^ (((bg) * 9) & 073))
-
-esc_state vt_st;
+#define MAKE_ATTR(fg, bg) (((fg) ^ (((bg) * 9) & 073)) << 8)
 
 void invert_screen() {
     for(size_t i=0; i<count_of(chardata32); i++) { chardata32[i] ^= 0x18001800; }
-}
-
-void clear_eol(int ps) {
-    size_t start = cx + cy * FB_WIDTH_CHAR, end = (cx+1) * FB_WIDTH_CHAR;
-    if(ps == 1) { end = start+1; }
-    if(ps > 0) { start = cy * FB_WIDTH_CHAR; }
-    uint16_t *chardata = (void*)chardata32;
-    for(size_t i = start; i< end; i++) { chardata[i] = 32 | attr; }
-}
-
-void clear_screen(int ps) {
-    size_t start = cx + cy * FB_WIDTH_CHAR, end = FB_HEIGHT_CHAR * FB_WIDTH_CHAR;
-    if(ps == 1) { end = start+1; }
-    if(ps > 0) { start = 0; }
-    uint16_t *chardata = (void*)chardata32;
-    for(size_t i = start; i< end; i++) { chardata[i] = 32 | attr; }
-}
-
-void cursor_left() {
-    if(cx > 0) cx -= 1;
-}
-
-void cursor_position(esc_state *st) {
-    // param 1 is row (cy), 1-bsaed
-    if(st->esc_param[1] > 0 && st->esc_param[1] < FB_WIDTH_CHAR) {
-        cx = st->esc_param[1] - 1;
-    }
-    // param 1 is column (cx), 1-bsaed
-    if(st->esc_param[0] > 0 && st->esc_param[0] < FB_HEIGHT_CHAR) {
-        cy = st->esc_param[0] - 1;
-    }
 }
 
 int map_one(int i) {
     return (i > 0) + (i > 6);
 }
 
-void char_attr(esc_state *st) {
-    int new_fg = 2;
-    int new_bg = 0;
-
-    for(int i= 0; i<count_of(st->esc_param); i++) {
-        int p = st->esc_param[i];
-        if (30 <= p && p <= 37) new_fg = map_one(p - 30);
-        if (90 <= p && p <= 97) new_fg = map_one(p - 90);
-        if (40 <= p && p <= 47) new_fg = map_one(p - 40);
-        if (100 <= p && p <= 107) new_fg = map_one(p - 100);
+lw_cell_t char_attr(void *user_data, const struct lw_parsed_attr *attr) {
+    int fg = map_one(attr->fg);
+    int bg = map_one(attr->bg);
+    if(attr->bold) fg = 3;
+    if(attr->blink) fg ^= 4;
+    if(attr->inverse) {
+        return MAKE_ATTR(bg, fg);
     }
-    attr = MAKE_ATTR(new_fg, new_bg) << 8;
+    return MAKE_ATTR(fg, bg);
 }
+
 
 int main() {
 #if !STANDALONE
@@ -316,70 +214,20 @@ int main() {
     stdio_init_all();
 #endif
 
+    vt100 = lw_terminal_vt100_init(NULL, NULL, NULL, FB_WIDTH_CHAR, FB_HEIGHT_CHAR);
+    multicore_launch_core1(core1_entry);
+
     scrnprintf(
 "(line 0)\r\n"
 "CR100 terminal demo...\r\n"
 );
 
-    for(int bg = 0; bg < 8; bg++) {
-        for(int fg = 0; fg < 8; fg++) {
-            attr = MAKE_ATTR(fg, bg) << 8;
-            scrnprintf(" %o%o ", bg, fg);
-            attr = 0x300;
-            scrnprintf(" ");
-        }
-        scrnprintf("\r\n");
-    }
-
-    multicore_launch_core1(core1_entry);
-    attr = 0x300;
-    show_cursor();
     while (true) {
         int c = getchar();
         if (c == EOF) { continue; }
 
-        vt_action action = vt_process_code(&vt_st, c);
-
-        if (action == NO_OUTPUT) { continue; }
-
-        hide_cursor();
-        switch(action) {
-            case NO_OUTPUT:
-                __builtin_unreachable();
-
-            case PRINTABLE:
-                scrnprintf("%c", c);
-                if(0 && c == '\r')
-                    scrnprintf("\n");
-                break;
-
-            case BELL:
-                invert_screen();
-                sleep_ms(100);
-                invert_screen();
-                break;
-
-            case CLEAR_EOL:
-                clear_eol(vt_st.esc_param[0]);
-                break;
-
-            case CLEAR_SCREEN:
-                clear_screen(vt_st.esc_param[0]);
-                break;
-
-            case CURSOR_LEFT:
-                cursor_left();
-                break;
-
-            case CURSOR_POSITION:
-                cursor_position(&vt_st);
-                break;
-
-            case CHAR_ATTR:
-                char_attr(&vt_st);
-                break;
-        }
-        show_cursor();
+        char buf[2] = { c, 0 };
+        lw_terminal_vt100_read_str(vt100, buf);
     }
 
     return 0;
