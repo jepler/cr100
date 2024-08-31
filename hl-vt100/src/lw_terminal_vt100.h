@@ -118,6 +118,7 @@ char lw_terminal_vt100_get(struct lw_terminal_vt100 *vt100, unsigned int x, unsi
 const lw_cell_t *lw_terminal_vt100_getline(struct lw_terminal_vt100 *vt100, unsigned y);
 const lw_cell_t **lw_terminal_vt100_getlines(struct lw_terminal_vt100 *vt100);
 void lw_terminal_vt100_destroy(struct lw_terminal_vt100 *this);
-void lw_terminal_vt100_read_str(struct lw_terminal_vt100 *this, char *buffer);
+void lw_terminal_vt100_read_str(struct lw_terminal_vt100 *this, const char *buffer);
+void lw_terminal_vt100_read_buf(struct lw_terminal_vt100 *this, const char *buffer, size_t n);
 
 #endif

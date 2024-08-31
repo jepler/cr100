@@ -1181,10 +1181,15 @@ static void hide_cursor(struct lw_terminal_vt100 *this) {
     aset(this, x, y, this->saved_cell);
 }
 
-void lw_terminal_vt100_read_str(struct lw_terminal_vt100 *this, char *buffer)
+void lw_terminal_vt100_read_str(struct lw_terminal_vt100 *this, const char *buffer)
+{
+    lw_terminal_vt100_read_buf(this, buffer, strlen(buffer));
+}
+
+void lw_terminal_vt100_read_buf(struct lw_terminal_vt100 *this, const char *buffer, size_t len)
 {
     hide_cursor(this);
-    lw_terminal_parser_read_str(this->lw_terminal, buffer);
+    lw_terminal_parser_read_buf(this->lw_terminal, buffer, len);
     show_cursor(this);
 }
 
