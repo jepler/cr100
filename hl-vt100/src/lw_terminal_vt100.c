@@ -1017,7 +1017,7 @@ static void vt100_write_unicode(struct lw_terminal *term_emul, int c) {
         else
             vt100->x -= 1;
     }
-    if (vt100->selected_charset && c >= 95 && c < 127) {
+    if (!vt100->selected_charset && c >= 95 && c < 127) {
         c = c - 95;
     }
     set(vt100, vt100->x, vt100->y, c);
@@ -1115,7 +1115,7 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
         return NULL;
     this->margin_top = 0;
     this->margin_bottom = this->height - 1;
-    this->selected_charset = 0;
+    this->selected_charset = 1;
     this->x = 0;
     this->y = 0;
     this->modes = MASK_DECANM;
