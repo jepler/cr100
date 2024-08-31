@@ -1032,36 +1032,40 @@ static void vt100_write(struct lw_terminal *term_emul, char c) {
 
     vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
 
-    if (vt100->ustate == 0) {
-        if (uc < 0x80) {
-            vt100_write_unicode(term_emul, uc);
-        } else if((uc & 0xe0) == 0xc0) {
-            vt100->ustate = 1;
-            vt100->ubits = (uc & 0x1f);
-        } else if((uc & 0xf0) == 0xe0) {
-            vt100->ustate = 2;
-            vt100->ubits = (uc & 0xf);
-        } else if((uc & 0xf8) == 0xf0) {
-            vt100->ustate = 3;
-            vt100->ubits = (uc & 0x7);
+    if (vt100->unicode) {
+        if (vt100->ustate == 0) {
+            if (uc < 0x80) {
+                vt100_write_unicode(term_emul, uc);
+            } else if((uc & 0xe0) == 0xc0) {
+                vt100->ustate = 1;
+                vt100->ubits = (uc & 0x1f);
+            } else if((uc & 0xf0) == 0xe0) {
+                vt100->ustate = 2;
+                vt100->ubits = (uc & 0xf);
+            } else if((uc & 0xf8) == 0xf0) {
+                vt100->ustate = 3;
+                vt100->ubits = (uc & 0x7);
+            } else {
+                vt100_write_unicode(term_emul, REPLACEMENT);
+            }
         } else {
-            vt100_write_unicode(term_emul, REPLACEMENT);
-        }
-    } else {
-        if (uc < 0x80) {
-            vt100_write_unicode(term_emul, REPLACEMENT);
-            vt100_write_unicode(term_emul, uc);
-            vt100->ustate = 0;
-        } else if ((uc & 0xc0) != 0x80) {
-            vt100_write_unicode(term_emul, REPLACEMENT);
-            vt100->ustate = 0;
-        } else {
-            vt100->ubits <<= 6;
-            vt100->ubits |= uc & 0x3f;
-            if (--vt100->ustate == 0) {
-            vt100_write_unicode(term_emul, vt100->ubits);
+            if (uc < 0x80) {
+                vt100_write_unicode(term_emul, REPLACEMENT);
+                vt100_write_unicode(term_emul, uc);
+                vt100->ustate = 0;
+            } else if ((uc & 0xc0) != 0x80) {
+                vt100_write_unicode(term_emul, REPLACEMENT);
+                vt100->ustate = 0;
+            } else {
+                vt100->ubits <<= 6;
+                vt100->ubits |= uc & 0x3f;
+                if (--vt100->ustate == 0) {
+                vt100_write_unicode(term_emul, vt100->ubits);
+                }
             }
         }
+    } else {
+                vt100_write_unicode(term_emul, uc);
     }
 }
 
