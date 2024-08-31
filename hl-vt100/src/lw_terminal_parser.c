@@ -188,7 +188,13 @@ void lw_terminal_parser_read(struct lw_terminal *this, char c)
     }
 }
 
-void lw_terminal_parser_read_str(struct lw_terminal *this, char *c)
+void lw_terminal_parser_read_buf(struct lw_terminal *this, const char *c, size_t n)
+{
+    while (n--)
+        lw_terminal_parser_read(this, *c++);
+}
+
+void lw_terminal_parser_read_str(struct lw_terminal *this, const char *c)
 {
     while (*c)
         lw_terminal_parser_read(this, *c++);
