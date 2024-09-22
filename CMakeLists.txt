@@ -34,6 +34,7 @@ add_custom_command(
 
 
 pico_generate_pio_header(cr100 ${CMAKE_CURRENT_BINARY_DIR}/vga_660x480_60.pio)
+pico_generate_pio_header(cr100 ${CMAKE_CURRENT_BINARY_DIR}/vga_660x400_70.pio)
 
 target_link_libraries(cr100 pico_stdlib pico_multicore hardware_pio)
 

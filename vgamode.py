@@ -99,9 +99,10 @@ def print_pio_hsync_program(program_name_base, mode, h_divisor, cycles_per_pixel
 ; Horizontal sync program for {mode}
 ; PIO clock frequency = {mode.pixel_clock_khz:.1f}/{h_divisor}khz = {net_khz:.1f}
 ;
-.program {program_name_base}_hsync
+.program {program_name_base}_hsync_init
     pull block              ; Pull from FIFO to OSR (only happens once)
 
+.program {program_name_base}_hsync
 .wrap_target            ; Program wraps to here
 ; ACTIVE + FRONTPORCH {mode.visible_width} + {mode.hfront_porch} error {err}
     mov x, osr              ; Copy value from OSR to x scratch register
@@ -137,6 +138,11 @@ static inline void {program_name_base}_hsync_program_init(PIO pio, uint sm, uint
 
     // Load our configuration, and jump to the start of the program
     pio_sm_init(pio, sm, offset, &c);
+
+    // Set up initial state by magic
+    pio_sm_put_blocking(pio, sm, {mode.visible_height}-1);
+    sm_exec_sequence(pio, sm, {program_name_base}_hsync_init_program.instructions, {program_name_base}_hsync_init_program.length);
+
     // Set the state machine running
     pio_sm_set_enabled(pio, sm, true);
 }}
@@ -169,11 +175,13 @@ def pio_yloop(instr, n, label, comment, file):
 
 def print_pio_vsync_program(program_name_base, mode, cycles_per_pixel, file=sys.stdout):
     print(f"""
+.program {program_name_base}_vsync_init
+    pull block                        ; Pull from FIFO to OSR (only once)
+
 .program {program_name_base}_vsync
 .side_set 1 opt
 ; Vertical sync program for {mode}
 ;
-    pull block                        ; Pull from FIFO to OSR (only once)
 
 .wrap_target                      ; Program wraps to here
 """, file=file)
@@ -217,6 +225,11 @@ static inline void {program_name_base}_vsync_program_init(PIO pio, uint sm, uint
 
     // Load our configuration, and jump to the start of the program
     pio_sm_init(pio, sm, offset, &c);
+
+    // Set up initial state by magic
+    pio_sm_put_blocking(pio, sm, {mode.visible_height}-1);
+    sm_exec_sequence(pio, sm, {program_name_base}_vsync_init_program.instructions, {program_name_base}_vsync_init_program.length);
+
     // Set the state machine running
     pio_sm_set_enabled(pio, sm, true);
 
@@ -229,24 +242,33 @@ static inline void {program_name_base}_vsync_program_init(PIO pio, uint sm, uint
 
 def print_pio_pixel_program(program_name_base, mode, out_instr, cycles_per_pixel, file=sys.stdout):
     net_khz = cycles_per_pixel * mode.pixel_clock_khz
-    assert cycles_per_pixel >= 2
+    assert cycles_per_pixel >= 4
     print(f"""
+.program {program_name_base}_pixel_init
+    pull block                  ; Pull from FIFO to OSR (only once)
+    mov y, osr                  ; Copy value from OSR to y scratch register
+    out null, 32                ; Clear OSR so first pixels out are right
+
 .program {program_name_base}_pixel
 ; Pixel generator program for {mode}
 ; PIO clock frequency = {cycles_per_pixel}×{mode.pixel_clock_khz}khz = {net_khz}
-    pull block                  ; Pull from FIFO to OSR (only once)
-    mov y, osr                  ; Copy value from OSR to y scratch register
-    pull block                  ; Pull first pixel data
 
 .wrap_target
+top:
     set pins, 0                   ; Zero RGB pins in blanking
     mov x, y                      ; Initialize counter variable
 
     wait 1 irq 1 [{cycles_per_pixel-1}] ; wait for vsync active mode
 
 colorout:
-    {out_instr} [{cycles_per_pixel-2}]
-    jmp x-- colorout        ; Stay here thru horizontal active mode
+    {out_instr} [{cycles_per_pixel-3}]
+    jmp pin, notrig
+; trig:
+    in x, 32
+    jmp x--, colorout
+    jmp top
+notrig:
+    jmp x-- colorout [1]    ; Stay here thru horizontal active mode
 
 .wrap""", file=file)
 
@@ -274,12 +296,31 @@ static inline void {program_name_base}_pixel_program_init(PIO pio, uint sm, uint
 
     // Load our configuration, and jump to the start of the program
     pio_sm_init(pio, sm, offset, &c);
+
+    // Set up register contents
+    pio_sm_put_blocking(pio, sm, {mode.visible_width}-1);
+    sm_exec_sequence(pio, sm, {program_name_base}_pixel_init_program.instructions, {program_name_base}_pixel_init_program.length);
+
     // Set the state machine running
     pio_sm_set_enabled(pio, sm, true);
 }}
 
 %}}
 """, file=file)
+
+def print_pio_preamble(file):
+    print("""
+.program preamble
+% c-sdk {
+
+static inline void sm_exec_sequence(PIO pio, uint sm, const uint16_t *instructions, size_t len) {
+    for(;len--; instructions++) {
+        pio_sm_exec_wait_blocking(pio, sm, *instructions);
+    }
+}
+
+%}
+    """, file=file)
 
 mode_vga_640x480 = VideoMode(25_175, 640, 16, 96, 48, Polarity.Negative, 480, 10, 2, 33, Polarity.Negative)
 mode_vga_660x480 = change_visible_pixels(mode_vga_640x480, 660, 26_000)
@@ -295,6 +336,7 @@ if 1:
     print(mode_vga_660x400, 6*mode_vga_660x400.pixel_clock_khz)
 
 def print_all(mode, h_divisor=1, out_instr="out pins, 2", cycles_per_pixel=6, file=sys.stdout):
+    print_pio_preamble(file=file)
     program_name = f"vga_{mode.visible_width}x{mode.visible_height}_{mode.frame_rate_hz:.0f}"
     print_pio_hsync_program(program_name, mode, h_divisor, cycles_per_pixel, file=file)
     print("\n\n\n", file=file)
