@@ -157,9 +157,9 @@ int scrnprintf(const char *fmt, ...) {
 uint16_t base_shade[] = {0, 0x554, 0xaa8, 0xffc, 0, 0x554, 0xaa8, 0xffc, 0, 0, 0, 0};
 
 #if !STANDALONE
-#define HSYNC_PIN (16)
+#define HSYNC_PIN (14)
 #define VSYNC_PIN (17)
-#define G0_PIN (9) // "green 3" on VGA pico demo base
+#define G0_PIN (15)
 
 static void setup_vga_hsync(PIO pio) {
     uint offset = pio_add_program(pio, &vga_660x477_60_hsync_program);
