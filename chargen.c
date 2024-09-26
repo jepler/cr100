@@ -1,9 +1,10 @@
 #define _GNU_SOURCE
 #include <stdint.h>
 
-#include "pico/platform.h"
+#include "pico.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
+#include "hardware/clocks.h"
 #include "vga_660x480_60.pio.h"
 
 #include "vt.h"
