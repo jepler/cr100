@@ -13,7 +13,7 @@ pico_sdk_init()
 
 project(pico-cr100)
 
-add_executable(cr100 chargen.c vt.c)
+add_executable(cr100 chargen.c vt.c keyboard.c)
 
 pico_enable_stdio_usb(cr100 1)
 

@@ -1,10 +1,14 @@
 #define _GNU_SOURCE
 #include <stdint.h>
 
+#include "pinout.h"
+#include "keyboard.h"
+
 #include "pico.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/clocks.h"
+
 #include "vga_660x477_60.pio.h"
 
 #include "vt.h"
@@ -157,10 +161,6 @@ int scrnprintf(const char *fmt, ...) {
 uint16_t base_shade[] = {0, 0x554, 0xaa8, 0xffc, 0, 0x554, 0xaa8, 0xffc, 0, 0, 0, 0};
 
 #if !STANDALONE
-#define HSYNC_PIN (14)
-#define VSYNC_PIN (17)
-#define G0_PIN (15)
-
 static void setup_vga_hsync(PIO pio) {
     uint offset = pio_add_program(pio, &vga_660x477_60_hsync_program);
     uint sm = pio_claim_unused_sm(pio, true);
@@ -300,6 +300,8 @@ int main() {
     }
 
     multicore_launch_core1(core1_entry);
+    keyboard_setup();
+
     attr = 0x300;
     show_cursor();
     while (true) {

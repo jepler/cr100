@@ -1,0 +1,77 @@
+.program atkbd
+.pio_version 0
+.in 32 right auto
+;.out 2 left auto
+;.set 2
+;; todo: use 'wait gpio' (or 'wait jmp' [rp2350]) so any pair of pins
+;; can be used
+    ;wait 1 pin 1        ; wait for keyboard to signal ready (not necessary?)
+
+    .wrap_target
+start:
+    jmp !osre send_byte ; if a byte is pending to send, do that
+    jmp pin start       ; otherwise wait for keyboard to send something
+
+    ; keyboard has signaled start condition
+    set x 9             ; will receive 10 bits (data + parity + stop)
+    wait 1 pin 1        ; wait for clock pin to go high (discard start bit)
+    
+receive_bit:
+    wait 0 pin 1
+    in pins 1
+    wait 1 pin 1
+    jmp x-- receive_bit
+
+    jmp start
+
+send_byte:
+    set pins 0         ; will be pulling lines low selectively
+    set pindirs 2 [31] ; pull clock low to request to send
+    set pindirs 1      ; set data pin to output & send "R" bit
+    set x 8            ; will send 9 bits (data + parity)
+
+send_bit:
+    wait 0 pin 1
+    out pins 1
+    wait 1 pin 1
+    jmp x-- send_bit
+    
+    set pindirs 0      ; pins back to input mode
+    wait 0 pin 0
+    wait 1 pin 0        ; wait for keyboard ACK
+    .wrap
+
+
+% c-sdk {
+#include "hardware/clocks.h"
+void atkbd_program_init(PIO pio, int sm, int base_pin) {
+    pio_sm_config c = vga_660x400_70_program_get_default_config(offset);
+
+    sm_config_set_in_pins(&c, base_pin);
+    sm_config_set_in_shift(&c, 1, 1, 10);
+
+    sm_config_set_out_pins(&c, base_pin, 2);
+    sm_config_set_out_shift(&c, 0, 1, 9);
+
+    sm_config_set_set_pins(&c, base_pin, 2);
+
+    sm_config_set_jmp_pin(&c, base_pin + 1);
+
+    sm_config_set_clkdiv(&c, clock_get_hz(clk_sys() / 8000000); // 8 MHz
+
+    // Set this pin's GPIO function (connect PIO to the pad)
+    pio_gpio_init(pio, base_pin);
+    pio_gpio_init(pio, base_pin+1);
+
+    // make sure the pins are outputs
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 2, false);
+
+    // Load our configuration, and jump to the start of the program
+    pio_sm_init(pio, sm, offset, &c);
+
+    // Set the state machine running
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+%}
+
