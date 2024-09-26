@@ -55,7 +55,7 @@ class VideoMode:
     def __repr__(self):
         return f"<VideoMode {self.visible_width}x{self.visible_height} {self.line_rate_khz:.2f}kHz/{self.frame_rate_hz:.2f}Hz pclk={self.pixel_clock_khz:.0f}KHz hvis={self.visible_line_time_us:.2f}us>"
 
-def change_visible_pixels(mode_in, new_w, new_clock=None):
+def change_visible_width(mode_in, new_w, new_clock=None):
     print(mode_in)
     if new_clock is None:
         new_clock = mode_in.pixel_clock_khz * new_w  / mode_in.visible_width
@@ -83,6 +83,19 @@ def change_visible_pixels(mode_in, new_w, new_clock=None):
     print()
     return new_mode
 
+def change_visible_height(mode_in, new_h):
+    delta_rows = mode_in.visible_height - new_h
+    delta_front_porch = delta_rows // 2
+    delta_back_porch = delta_rows - delta_front_porch
+    new_mode = replace(mode_in,
+        visible_height = new_h,
+        vfront_porch = mode_in.vfront_porch + delta_front_porch,
+        vback_porch = mode_in.vback_porch + delta_back_porch)
+    print(new_mode)
+    print()
+    assert new_mode.total_lines == mode_in.total_lines
+    return new_mode
+
 def pio_hard_delay(instr, n, file):
     assert n > 0
     assert n < 128
@@ -100,8 +113,6 @@ def print_pio_hsync_program(program_name_base, mode, h_divisor, cycles_per_pixel
 ; PIO clock frequency = {mode.pixel_clock_khz:.1f}/{h_divisor}khz = {net_khz:.1f}
 ;
 .program {program_name_base}_hsync
-    pull block              ; Pull from FIFO to OSR (only happens once)
-
 .wrap_target            ; Program wraps to here
 ; ACTIVE + FRONTPORCH {mode.visible_width} + {mode.hfront_porch} error {err}
     mov x, osr              ; Copy value from OSR to x scratch register
@@ -137,6 +148,11 @@ static inline void {program_name_base}_hsync_program_init(PIO pio, uint sm, uint
 
     // Load our configuration, and jump to the start of the program
     pio_sm_init(pio, sm, offset, &c);
+
+    // Set up the value in the OSR register
+    pio_sm_put(pio, sm, {mode.visible_width} + {mode.hfront_porch} - 1);
+    pio_sm_exec_wait_blocking(pio, sm, pio_encode_pull(false, true));
+ 
     // Set the state machine running
     pio_sm_set_enabled(pio, sm, true);
 }}
@@ -173,8 +189,6 @@ def print_pio_vsync_program(program_name_base, mode, cycles_per_pixel, file=sys.
 .side_set 1 opt
 ; Vertical sync program for {mode}
 ;
-    pull block                        ; Pull from FIFO to OSR (only once)
-
 .wrap_target                      ; Program wraps to here
 """, file=file)
 
@@ -217,6 +231,11 @@ static inline void {program_name_base}_vsync_program_init(PIO pio, uint sm, uint
 
     // Load our configuration, and jump to the start of the program
     pio_sm_init(pio, sm, offset, &c);
+
+    // Set up the value in the OSR register
+    pio_sm_put(pio, sm, {mode.visible_height} - 1);
+    pio_sm_exec_wait_blocking(pio, sm, pio_encode_pull(false, true));
+
     // Set the state machine running
     pio_sm_set_enabled(pio, sm, true);
 
@@ -234,9 +253,6 @@ def print_pio_pixel_program(program_name_base, mode, out_instr, cycles_per_pixel
 .program {program_name_base}_pixel
 ; Pixel generator program for {mode}
 ; PIO clock frequency = {cycles_per_pixel}×{mode.pixel_clock_khz}khz = {net_khz}
-    pull block                  ; Pull from FIFO to OSR (only once)
-    mov y, osr                  ; Copy value from OSR to y scratch register
-    pull block                  ; Pull first pixel data
 
 .wrap_target
     set pins, 0                   ; Zero RGB pins in blanking
@@ -274,6 +290,13 @@ static inline void {program_name_base}_pixel_program_init(PIO pio, uint sm, uint
 
     // Load our configuration, and jump to the start of the program
     pio_sm_init(pio, sm, offset, &c);
+
+    // Set up the value in the Y register
+    pio_sm_put(pio, sm, {mode.visible_width} - 1);
+    pio_sm_exec_wait_blocking(pio, sm, pio_encode_pull(false, true));
+    pio_sm_exec_wait_blocking(pio, sm, pio_encode_mov(pio_y, pio_osr));
+    pio_sm_exec_wait_blocking(pio, sm, pio_encode_out(pio_null, 30));
+
     // Set the state machine running
     pio_sm_set_enabled(pio, sm, true);
 }}
@@ -282,12 +305,13 @@ static inline void {program_name_base}_pixel_program_init(PIO pio, uint sm, uint
 """, file=file)
 
 mode_vga_640x480 = VideoMode(25_175, 640, 16, 96, 48, Polarity.Negative, 480, 10, 2, 33, Polarity.Negative)
-mode_vga_660x480 = change_visible_pixels(mode_vga_640x480, 660, 26_000)
+mode_vga_660x480 = change_visible_width(mode_vga_640x480, 660, 26_000)
+mode_vga_660x477 = change_visible_height(mode_vga_660x480, 477)
 
 mode_vga_720x400 = VideoMode(28_321, 720, 18, 108, 54, Polarity.Negative, 400, 10, 2, 36, Polarity.Positive)
-mode_vga_660x400 = change_visible_pixels(mode_vga_720x400, 660, 26_000)
+mode_vga_660x400 = change_visible_width(mode_vga_720x400, 660, 26_000)
 
-if 1:
+if 0:
     print(mode_vga_640x480, 6*mode_vga_640x480.pixel_clock_khz)
     print(mode_vga_660x480, 6*mode_vga_660x480.pixel_clock_khz)
 
@@ -302,8 +326,5 @@ def print_all(mode, h_divisor=1, out_instr="out pins, 2", cycles_per_pixel=6, fi
     print("\n\n\n", file=file)
     print_pio_pixel_program(program_name, mode, out_instr, cycles_per_pixel, file=file)
 
-with open("vga_660x480_60.pio", "wt", encoding="utf-8") as f:
-    print_all(mode_vga_660x480, file=f)
-
-with open("vga_660x400_70.pio", "wt", encoding="utf-8") as f:
-    print_all(mode_vga_660x400, file=f)
+with open("vga_660x477_60.pio", "wt", encoding="utf-8") as f:
+    print_all(mode_vga_660x477, file=f)

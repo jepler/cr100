@@ -20,14 +20,13 @@ pico_enable_stdio_usb(cr100 1)
 
 
 add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/vga_660x480_60.pio
-  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/vga_660x400_70.pio
-  COMMAND python ${CMAKE_CURRENT_LIST_DIR}/vgamode.py
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/vga_660x477_60.pio
+  COMMAND python3 ${CMAKE_CURRENT_LIST_DIR}/vgamode.py
   DEPENDS vgamode.py
   )
 
 
-pico_generate_pio_header(cr100 ${CMAKE_CURRENT_BINARY_DIR}/vga_660x480_60.pio)
+pico_generate_pio_header(cr100 ${CMAKE_CURRENT_BINARY_DIR}/vga_660x477_60.pio)
 pico_generate_pio_header(cr100 ${CMAKE_CURRENT_LIST_DIR}/atkbd.pio)
 
 target_link_libraries(cr100 pico_stdlib pico_multicore hardware_pio)

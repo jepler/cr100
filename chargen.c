@@ -5,7 +5,7 @@
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/clocks.h"
-#include "vga_660x480_60.pio.h"
+#include "vga_660x477_60.pio.h"
 
 #include "vt.h"
 
@@ -162,24 +162,21 @@ uint16_t base_shade[] = {0, 0x554, 0xaa8, 0xffc, 0, 0x554, 0xaa8, 0xffc, 0, 0, 0
 #define G0_PIN (9) // "green 3" on VGA pico demo base
 
 static void setup_vga_hsync(PIO pio) {
-    uint offset = pio_add_program(pio, &vga_660x480_60_hsync_program);
+    uint offset = pio_add_program(pio, &vga_660x477_60_hsync_program);
     uint sm = pio_claim_unused_sm(pio, true);
-    vga_660x480_60_hsync_program_init(pio, sm, offset, HSYNC_PIN);
-    pio_sm_put_blocking(pio, sm, 660+16-1);
+    vga_660x477_60_hsync_program_init(pio, sm, offset, HSYNC_PIN);
 }
 
 static void setup_vga_vsync(PIO pio) {
-    uint offset = pio_add_program(pio, &vga_660x480_60_vsync_program);
+    uint offset = pio_add_program(pio, &vga_660x477_60_vsync_program);
     uint sm = pio_claim_unused_sm(pio, true);
-    vga_660x480_60_vsync_program_init(pio, sm, offset, VSYNC_PIN);
-    pio_sm_put_blocking(pio, sm, 477-1);
+    vga_660x477_60_vsync_program_init(pio, sm, offset, VSYNC_PIN);
 }
 
 static int setup_vga_pixels(PIO pio) {
-    uint offset = pio_add_program(pio, &vga_660x480_60_pixel_program);
+    uint offset = pio_add_program(pio, &vga_660x477_60_pixel_program);
     uint sm = pio_claim_unused_sm(pio, true);
-    vga_660x480_60_pixel_program_init(pio, sm, offset, G0_PIN, 2);
-    pio_sm_put_blocking(pio, sm, 660-1);
+    vga_660x477_60_pixel_program_init(pio, sm, offset, G0_PIN, 2);
     return sm;
 }
 
@@ -200,32 +197,6 @@ void __not_in_flash_func(core1_entry)() {
     int frameno = 0;
     setup_vga();
 
-    // Something causes a 1-fifo-entry shift. I failed to diagnose it so this
-    // terrible workaround is put into place: it shifts out a whole screen
-    // minus one FIFO entry.  *sob*
-    // (also the top text row is not visible on my test LCD but who knows why
-    // this could be. we'll get it on real HW and find out what's what.)
-    {
-        uint32_t pixels = 0;
-        for(int i=0; i<21; i++) {
-            WRITE_PIXDATA;
-            WRITE_PIXDATA;
-            WRITE_PIXDATA;
-            WRITE_PIXDATA;
-            WRITE_PIXDATA;
-            WRITE_PIXDATA;
-            FIFO_WAIT;
-        }
-        WRITE_PIXDATA;
-        WRITE_PIXDATA;
-        WRITE_PIXDATA;
-        WRITE_PIXDATA;
-        WRITE_PIXDATA;
-        FIFO_WAIT;
-        for(int i=0; i<476; i++) {
-            scan_convert_static_row(0);
-        }
-    }
     while(true) {
         for(int row = 0; row < FB_HEIGHT_CHAR; row++) {
             for(int j=0; j<CHAR_Y; j++) {
@@ -309,7 +280,7 @@ void char_attr(esc_state *st) {
 
 int main() {
 #if !STANDALONE
-    set_sys_clock_khz(vga_660x480_60_sys_clock_khz, false);
+    set_sys_clock_khz(vga_660x477_60_sys_clock_khz, false);
     stdio_init_all();
 #endif
 
