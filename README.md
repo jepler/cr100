@@ -32,15 +32,21 @@ To build, run `make submodules && make uf2`.
 The `make flash` routine depends on scripts on the developer's system, not bundled here.
 
 ## Pinout
- * 9, 10: luminance channel. Use a resistor network to convert to VGA levels.
- * 16: HSYNC
- * 17: VSYNC
+Read the source :)
+
+Final pinout plan (RP2040 GPIO numbering):
+ * 0/1/2/3: UART 0 with optional flow control OR
+ * 12/13/14/15: UART 0 with optional flow control (sw selectable)
+
+ * 4/5/6/7: UART 1 with optional flow control OR
+ * 8/9/10/11: UART 1 with optional flow control (sw selectable)
+
+ * 16/17/18/19: VGA
+ * 20/21: PS2
 
 ## DAC resistors
 
-Some doodling indicates that, assuming the I/O level as 3.3v, resistors of 390Ω
-and 820Ω should be readily available and give not terrible voltages topping out around
-0.7v across the VGA 75 ohm load resistor.
+On the test monitor 440Ω & 660Ω resistances give good luminance levels though the top voltage ends up slightly out of spec at around 750mV.
 
 ## Inspiration; Software & Hardware I Studied
 
