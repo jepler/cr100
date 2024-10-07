@@ -124,11 +124,9 @@ static void setup_vga(void) {
     setup_vga_hsync(pio0);
 }
 
-static
-void __not_in_flash_func(core1_entry)(void) {
+__attribute__((noreturn,noinline))
+static void __not_in_flash_func(core1_loop)(void) {
     int frameno = 0;
-    setup_vga();
-
     while(true) {
         for(int row = 0; row < FB_HEIGHT_CHAR; row++) {
             uint32_t *chardata = (uint32_t*)lw_terminal_vt100_getline(vt100, row);
@@ -140,6 +138,14 @@ void __not_in_flash_func(core1_entry)(void) {
         
         frameno += 1;
     }
+}
+
+static
+__attribute__((noreturn,noinline))
+void core1_entry(void) {
+    setup_vga();
+
+    core1_loop();
 }
 #endif
 

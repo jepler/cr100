@@ -176,13 +176,15 @@ static unsigned int get_mode_mask(unsigned int mode)
   no increase in character resolution.
 */
 
+#define MOD1(a, b) ((a < b) ? a : a - b)
+
 #define SCREEN_PTR(vt100, x, y)                                 \
-    ((vt100->top_line * vt100->width + x + vt100->width * y)    \
-     % (vt100->width * SCROLLBACK * vt100->height))
+    MOD1((vt100->top_line * vt100->width + x + vt100->width * y),   \
+       (vt100->width * SCROLLBACK * vt100->height))
 
 #define FROZEN_SCREEN_PTR(vt100, x, y)              \
-    ((x + vt100->width * y)                         \
-     % (vt100->width * SCROLLBACK * vt100->height))
+    (MOD1(x + vt100->width * y,                        \
+       (vt100->width * SCROLLBACK * vt100->height)))
 
 static lw_cell_t aget(struct lw_terminal_vt100 *headless_term,
                 unsigned int x, unsigned int y)
@@ -1069,7 +1071,12 @@ static void vt100_write(struct lw_terminal *term_emul, char c) {
     }
 }
 
-const lw_cell_t *lw_terminal_vt100_getline(struct lw_terminal_vt100 *vt100, unsigned int y) {
+#if defined(PICO_BUILD)
+#include "pico.h"
+#else
+#define __not_in_flash_func(x) x
+#endif
+const lw_cell_t *__not_in_flash_func(lw_terminal_vt100_getline)(struct lw_terminal_vt100 *vt100, unsigned int y) {
     if (y < vt100->margin_top || y > vt100->margin_bottom)
         return vt100->afrozen_screen + FROZEN_SCREEN_PTR(vt100, 0, y);
     else
