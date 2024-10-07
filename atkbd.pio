@@ -44,8 +44,8 @@ send_bit:
 
 % c-sdk {
 #include "hardware/clocks.h"
-void atkbd_program_init(PIO pio, int sm, int base_pin) {
-    pio_sm_config c = vga_660x400_70_program_get_default_config(offset);
+void atkbd_program_init(PIO pio, int sm, int offset, int base_pin) {
+    pio_sm_config c = atkbd_program_get_default_config(offset);
 
     sm_config_set_in_pins(&c, base_pin);
     sm_config_set_in_shift(&c, 1, 1, 10);
@@ -57,14 +57,14 @@ void atkbd_program_init(PIO pio, int sm, int base_pin) {
 
     sm_config_set_jmp_pin(&c, base_pin + 1);
 
-    sm_config_set_clkdiv(&c, clock_get_hz(clk_sys() / 8000000); // 8 MHz
+    sm_config_set_clkdiv(&c, clock_get_hz(clk_sys) / 8000000); // 8 MHz
 
     // Set this pin's GPIO function (connect PIO to the pad)
     pio_gpio_init(pio, base_pin);
     pio_gpio_init(pio, base_pin+1);
 
-    // make sure the pins are outputs
-    pio_sm_set_consecutive_pindirs(pio, sm, pin, 2, false);
+    // make sure the pins are initially inputs
+    pio_sm_set_consecutive_pindirs(pio, sm, base_pin, 2, false);
 
     // Load our configuration, and jump to the start of the program
     pio_sm_init(pio, sm, offset, &c);
