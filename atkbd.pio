@@ -49,10 +49,10 @@ void atkbd_program_init(PIO pio, int sm, int offset, int base_pin) {
     pio_sm_config c = atkbd_program_get_default_config(offset);
 
     sm_config_set_in_pins(&c, base_pin);
-    sm_config_set_in_shift(&c, 1, 1, 10);
+    sm_config_set_in_shift(&c, /* shift right*/ 1, /* auto */ 1, /* N */ 10);
 
     sm_config_set_out_pins(&c, base_pin, 2);
-    sm_config_set_out_shift(&c, 0, 1, 9);
+    sm_config_set_out_shift(&c, /* shift right */ 1, /* auto */ 1, /* N */ 9);
 
     sm_config_set_set_pins(&c, base_pin, 2);
 
@@ -69,6 +69,9 @@ void atkbd_program_init(PIO pio, int sm, int offset, int base_pin) {
 
     // Load our configuration, and jump to the start of the program
     pio_sm_init(pio, sm, offset, &c);
+
+    // let's clear out anything that was pending
+    pio_sm_clear_fifos(pio, sm);
 
     // Set the state machine running
     pio_sm_set_enabled(pio, sm, true);

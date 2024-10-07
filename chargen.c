@@ -3,11 +3,16 @@
 
 #include "pinout.h"
 #include "keyboard.h"
+#include "chargen.h"
 
 #include "pico.h"
 #include "pico/stdlib.h"
+#include "pico/stdio/driver.h"
 #include "pico/multicore.h"
+#include "hardware/structs/mpu.h"
 #include "hardware/clocks.h"
+#include "cmsis_compiler.h"
+#include "RP2040.h"
 
 #include "vga_660x477_60.pio.h"
 
@@ -82,7 +87,6 @@ int cx, cy, attr = 0x300;
 
 _Static_assert(FB_WIDTH_CHAR % 6 == 0);
 
-static
 int scrnprintf(const char *fmt, ...) {
     char *ptr;
     va_list ap;
@@ -142,8 +146,18 @@ static void __not_in_flash_func(core1_loop)(void) {
 
 static
 __attribute__((noreturn,noinline))
-void core1_entry(void) {
+void __not_in_flash_func(core1_entry)(void) {
     setup_vga();
+
+    // Turn off flash access. After this, it will hard fault. Better than messing
+    // up CIRCUITPY.
+    MPU->CTRL = MPU_CTRL_PRIVDEFENA_Msk | MPU_CTRL_ENABLE_Msk;
+    MPU->RNR = 6; // 7 is used by pico-sdk stack protection.
+    MPU->RBAR = XIP_MAIN_BASE | MPU_RBAR_VALID_Msk;
+    MPU->RASR = MPU_RASR_XN_Msk | // Set execute never and everything else is restricted.
+        MPU_RASR_ENABLE_Msk |
+        (0x1b << MPU_RASR_SIZE_Pos);         // Size is 0x10000000 which masks up to SRAM region.                                                                                         
+    MPU->RNR = 7;                                                                            
 
     core1_loop();
 }
@@ -169,6 +183,24 @@ static lw_cell_t char_attr(void *user_data, const struct lw_parsed_attr *attr) {
     return MAKE_ATTR(fg, bg);
 }
 
+queue_t keyboard_queue;
+
+static
+int stdio_kbd_in_chars(char *buf, int length) {
+    int rc = 0;
+    int code;
+    keyboard_poll(&keyboard_queue);
+    while (length && queue_try_remove(&keyboard_queue, &code)) {
+        *buf++ = code;
+        length--;
+        rc++;
+    }
+    return (rc == 0) ? PICO_ERROR_NO_DATA : rc;
+}
+
+static stdio_driver_t stdio_kbd = {
+    .in_chars = stdio_kbd_in_chars,
+};
 
 int main(void) {
 #if !STANDALONE
@@ -183,6 +215,11 @@ int main(void) {
 "(line 0)\r\n"
 "CR100 terminal demo...\r\n"
 );
+
+    if (keyboard_setup(pio1)) {
+        queue_init(&keyboard_queue, sizeof(int), 64);
+        stdio_set_driver_enabled(&stdio_kbd, true);
+    }
 
     while (true) {
         int c = getchar();
