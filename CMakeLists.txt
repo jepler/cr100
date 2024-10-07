@@ -15,7 +15,6 @@ project(pico-cr100)
 
 add_executable(cr100
     chargen.c
-    vt.c
     keyboard.c
     hl-vt100/src/lw_terminal_parser.c
     hl-vt100/src/lw_terminal_vt100.c
