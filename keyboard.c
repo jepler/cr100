@@ -27,7 +27,6 @@ static int kbd_read_timeout(int timeout_us) {
     int r = ll_kbd_read_timeout(timeout_us);
     if (r == EOF) { return EOF; }
     r = (r >> 22) & 0xff;
-    scrnprintf("\r\n-> %08x\r\n\r\n", r);
     return r; // todo: check parity, start & end bits!
 }
 
@@ -84,8 +83,18 @@ bool keyboard_setup(PIO pio) {
     return ok;
 }
 
+enum { SHIFT=1, CTRL=2, ALT=3 };
+const char keyboard_modifiers[256] = {
+    [0x12] = SHIFT,
+    [0x59] = SHIFT,
+    [0x11] = CTRL,
+    [0x58] = CTRL,
+    [0x19] = ALT,
+    [0x39] = ALT,
+};
+
 const char *keyboard_codes[256] = {
-    [0x08] = "\e",
+    [0x08] = "ESC",
     [0x07] = "F1",
     [0x0f] = "F2",
     [0x17] = "F3",
@@ -96,11 +105,27 @@ const char *keyboard_codes[256] = {
     [0x2d] = "r",
 };
 
+bool pending_release;
+int current_modifiers = 0;
+
 static
-void queue_add_str(queue_t *q, const char *value) {
-    if (!value) { return; }
-    while(*value) {
-        int data = *value++;
+void queue_add_str(queue_t *q, bool release, int value) {
+    int modifiers = keyboard_modifiers[value];
+    if (modifiers) {
+        if(release) current_modifiers &= ~modifiers;
+        else current_modifiers |= modifiers;
+        scrnprintf("\r\nModifiers -> 0x%02x\r\n", current_modifiers); 
+        return;
+    }
+    if(release) { return; }
+
+    const char *ptr = keyboard_codes[value];
+    if (!ptr) {
+        scrnprintf("\r\nUn-mapped key: 0x%02x\r\n", value); 
+        return;
+    }
+    while(*ptr) {
+        int data = *ptr++;
         queue_try_add(q, &data);
     }
 }
@@ -115,9 +140,11 @@ void keyboard_poll(queue_t *q) {
             kbd_write_blocking(pending_led_value);
             pending_led_flag = false;
         }
-    }
-    else {
-        queue_add_str(q, keyboard_codes[value]);
+    } else if (value == 0xf0) {
+        pending_release = true;
+    } else {
+        queue_add_str(q, pending_release, value);
+        pending_release = false;
     }
 }
 
