@@ -28,6 +28,8 @@ int pixels_sm;
 
 struct lw_terminal_vt100 *vt100;
 
+// declaring this static breaks it (why?)
+void scan_convert(const uint32_t * restrict cptr32, const uint16_t * restrict cgptr, const uint16_t * restrict shade);
 void __not_in_flash_func(scan_convert)(const uint32_t * restrict cptr32, const uint16_t * restrict cgptr, const uint16_t * restrict shade) {
 #define READ_CHARDATA \
     (ch = *cptr32++)
@@ -55,22 +57,16 @@ void __not_in_flash_func(scan_convert)(const uint32_t * restrict cptr32, const u
         ONE_CHAR(0, |=, << 10); \
         ONE_CHAR(16, |=, ); \
         WRITE_PIXDATA; \
-        FIFO_WAIT; \
     } while(0)
 
-#define ONE_SCAN \
-    do { \
-        SIX_CHARS; SIX_CHARS; SIX_CHARS; FIFO_WAIT; /*  18 */ \
-        SIX_CHARS; SIX_CHARS; SIX_CHARS; FIFO_WAIT; /*  36 */ \
-        SIX_CHARS; SIX_CHARS; SIX_CHARS; FIFO_WAIT; /*  54 */ \
-        SIX_CHARS; SIX_CHARS; SIX_CHARS; FIFO_WAIT; /*  72 */ \
-        SIX_CHARS; SIX_CHARS; SIX_CHARS; FIFO_WAIT; /*  90 */ \
-        SIX_CHARS; SIX_CHARS; SIX_CHARS; FIFO_WAIT; /* 108 */ \
-        SIX_CHARS; SIX_CHARS; SIX_CHARS; FIFO_WAIT; /* 126 */ \
-        SIX_CHARS; FIFO_WAIT; /* 132 */ \
-    } while (0)
-
-    ONE_SCAN;
+    SIX_CHARS; SIX_CHARS; SIX_CHARS; FIFO_WAIT; /*  18 */ \
+    SIX_CHARS; SIX_CHARS; SIX_CHARS; FIFO_WAIT; /*  36 */ \
+    SIX_CHARS; SIX_CHARS; SIX_CHARS; FIFO_WAIT; /*  54 */ \
+    SIX_CHARS; SIX_CHARS; SIX_CHARS; FIFO_WAIT; /*  72 */ \
+    SIX_CHARS; SIX_CHARS; SIX_CHARS; FIFO_WAIT; /*  90 */ \
+    SIX_CHARS; SIX_CHARS; SIX_CHARS; FIFO_WAIT; /* 108 */ \
+    SIX_CHARS; SIX_CHARS; SIX_CHARS; FIFO_WAIT; /* 126 */ \
+    SIX_CHARS; /* 132 */ \
 }
 
 #include <stdio.h>
@@ -86,10 +82,7 @@ int cx, cy, attr = 0x300;
 
 _Static_assert(FB_WIDTH_CHAR % 6 == 0);
 
-int writefn(void *cookie, const char *data, int n) {
-    return n;
-}
-
+static
 int scrnprintf(const char *fmt, ...) {
     char *ptr;
     va_list ap;
@@ -101,6 +94,7 @@ int scrnprintf(const char *fmt, ...) {
     return n;
 }
 
+static
 uint16_t base_shade[] = {0, 0x554, 0xaa8, 0xffc, 0, 0x554, 0xaa8, 0xffc, 0, 0, 0, 0};
 
 #if !STANDALONE
@@ -123,20 +117,15 @@ static int setup_vga_pixels(PIO pio) {
     return sm;
 }
 
-static void setup_vga() {
+static void setup_vga(void) {
     pixels_sm = setup_vga_pixels(pio0);
     assert(pixels_sm == 0);
     setup_vga_vsync(pio0);
     setup_vga_hsync(pio0);
 }
 
-void __not_in_flash_func(scan_convert_static_row)(int32_t pixels) {
-#undef SIX_CHARS
-#define SIX_CHARS do { WRITE_PIXDATA; WRITE_PIXDATA; } while(0)
-    ONE_SCAN;
-}
-
-void __not_in_flash_func(core1_entry)() {
+static
+void __not_in_flash_func(core1_entry)(void) {
     int frameno = 0;
     setup_vga();
 
@@ -159,11 +148,11 @@ void __not_in_flash_func(core1_entry)() {
 
 #define MAKE_ATTR(fg, bg) (((fg) ^ (((bg) * 9) & 073)) << 8)
 
-int map_one(int i) {
+static int map_one(int i) {
     return (i > 0) + (i > 6);
 }
 
-lw_cell_t char_attr(void *user_data, const struct lw_parsed_attr *attr) {
+static lw_cell_t char_attr(void *user_data, const struct lw_parsed_attr *attr) {
     int fg = map_one(attr->fg);
     int bg = map_one(attr->bg);
     if(attr->bold) fg = 3;
@@ -175,7 +164,7 @@ lw_cell_t char_attr(void *user_data, const struct lw_parsed_attr *attr) {
 }
 
 
-int main() {
+int main(void) {
 #if !STANDALONE
     set_sys_clock_khz(vga_660x477_60_sys_clock_khz, false);
     stdio_init_all();

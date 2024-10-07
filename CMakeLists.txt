@@ -7,7 +7,7 @@ project(pico_examples C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-add_compile_options(-Wall -Werror -O2)
+add_compile_options(-Wall -O2)
 
 pico_sdk_init()
 
@@ -21,7 +21,16 @@ add_executable(cr100
     hl-vt100/src/lw_terminal_vt100.c
     )
 
-target_include_directories(cr100 PRIVATE hl-vt100/src)
+set_source_files_properties(chargen.c PROPERTIES COMPILE_OPTIONS "-Wall;-Wmissing-prototypes;-Wmissing-declarations;-Wstrict-prototypes;-O2")
+set_source_files_properties(vt.c PROPERTIES COMPILE_OPTIONS "-Wall;-Wmissing-prototypes;-Wmissing-declarations;-Wstrict-prototypes;-O2")
+set_source_files_properties(keyboard.c PROPERTIES COMPILE_OPTIONS "-Wall;-Wmissing-prototypes;-Wmissing-declarations;-Wstrict-prototypes;-O2")
+set_source_files_properties(hl-vt100/src/lw_terminal_parser.c PROPERTIES COMPILE_OPTIONS "-Wall;-Wmissing-prototypes;-Wmissing-declarations;-Wstrict-prototypes;-O2")
+set_source_files_properties(hl-vt100/src/lw_terminal_vt100.c PROPERTIES COMPILE_OPTIONS "-Wall;-Wmissing-prototypes;-Wmissing-declarations;-Wstrict-prototypes;-O2")
+
+target_compile_options(cr100 PRIVATE
+    )
+
+target_include_directories(cr100 PRIVATE hl-vt100/src ${CMAKE_CURRENT_LIST_DIR})
 
 pico_enable_stdio_usb(cr100 1)
 

@@ -115,6 +115,7 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
                                                          const struct lw_parsed_attr *attr),
                                      unsigned int width, unsigned int height);
 char lw_terminal_vt100_get(struct lw_terminal_vt100 *vt100, unsigned int x, unsigned int y);
+lw_cell_t lw_terminal_vt100_aget(struct lw_terminal_vt100 *vt100, unsigned int x, unsigned int y);
 const lw_cell_t *lw_terminal_vt100_getline(struct lw_terminal_vt100 *vt100, unsigned y);
 const lw_cell_t **lw_terminal_vt100_getlines(struct lw_terminal_vt100 *vt100);
 void lw_terminal_vt100_destroy(struct lw_terminal_vt100 *this);

@@ -43,6 +43,7 @@ send_bit:
 
 
 % c-sdk {
+#include "keyboard.h"
 #include "hardware/clocks.h"
 void atkbd_program_init(PIO pio, int sm, int offset, int base_pin) {
     pio_sm_config c = atkbd_program_get_default_config(offset);
