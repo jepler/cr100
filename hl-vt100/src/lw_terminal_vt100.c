@@ -1172,20 +1172,22 @@ free_this:
 
 #define CURSOR_ATTR (7 << 11) // very specific to cr100
 static void show_cursor(struct lw_terminal_vt100 *this) {
+    // return;
     unsigned x = this->x, y = this->y;
     lw_cell_t cell;
     if(x == this->width)
         x -= 1;
     cell = aget(this, x, y);
-    this->saved_cell = cell;
+    this->cursor_saved_cell = cell;
+    this->cursor_saved_x = x;
+    this->cursor_saved_y = y;
     aset(this, x, y, cell ^ CURSOR_ATTR);
 }
 
 static void hide_cursor(struct lw_terminal_vt100 *this) {
-    unsigned x = this->x, y = this->y;
-    if(x == this->width)
-        x -= 1;
-    aset(this, x, y, this->saved_cell);
+    // return;
+    unsigned x = this->cursor_saved_x, y = this->cursor_saved_y;
+    aset(this, x, y, this->cursor_saved_cell);
 }
 
 void lw_terminal_vt100_read_str(struct lw_terminal_vt100 *this, const char *buffer)

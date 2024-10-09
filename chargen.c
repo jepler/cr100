@@ -198,9 +198,18 @@ int stdio_kbd_in_chars(char *buf, int length) {
     return (rc == 0) ? PICO_ERROR_NO_DATA : rc;
 }
 
+static int kbd_getc_nonblocking(void) {
+    char c;
+    int result = stdio_kbd_in_chars(&c, 1);
+    if (result == PICO_ERROR_NO_DATA) { return EOF; }
+    return c;
+}
+
+#if 0
 static stdio_driver_t stdio_kbd = {
     .in_chars = stdio_kbd_in_chars,
 };
+#endif
 
 int main(void) {
 #if !STANDALONE
@@ -218,14 +227,19 @@ int main(void) {
 
     if (keyboard_setup(pio1)) {
         queue_init(&keyboard_queue, sizeof(int), 64);
-        stdio_set_driver_enabled(&stdio_kbd, true);
+        // stdio_set_driver_enabled(&stdio_kbd, true);
     }
 
     while (true) {
-        int c = getchar();
-        if (c == EOF) { continue; }
-        char cc = c;
-        lw_terminal_vt100_read_buf(vt100, &cc, 1);
+        int c = getchar_timeout_us(10);
+        if (c > 0) {
+            char cc = c;
+            lw_terminal_vt100_read_buf(vt100, &cc, 1);
+        }
+        c = kbd_getc_nonblocking();
+        if (c != EOF) {
+            putchar(c);
+        }
     }
 
     return 0;

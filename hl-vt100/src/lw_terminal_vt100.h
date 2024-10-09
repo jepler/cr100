@@ -101,7 +101,8 @@ struct lw_terminal_vt100
     unsigned int selected_charset;
     unsigned int modes;
     struct lw_parsed_attr parsed_attr;
-    lw_cell_t    attr, saved_cell;
+    lw_cell_t    attr, cursor_saved_cell;
+    int cursor_saved_x, cursor_saved_y;
     const lw_cell_t    *alines[80];
     void         (*master_write)(void *user_data, void *buffer, size_t len);
     lw_cell_t    (*encode_attr)(void *user_data, const struct lw_parsed_attr *attr);
