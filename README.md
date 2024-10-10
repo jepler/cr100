@@ -112,6 +112,31 @@ My 660x480@60Hz mode:
 
 I don't expect there to be any problem for an old monitor to sync to this signal.
 
+# Installing the terminal entry
+
+`make install-termcap` or `sudo make install-termcap` (to install systemwide, best if enabling getty).
+
+# Enabling getty on Linux
+
+Find the serial number of your device and create a udev rule for it (in a file like `/etc/udev/rules.d/97-cr100.rules`) that gives it a consistent name in /dev:
+```
+KERNEL=="ttyACM[0-9]*", ENV{ID_SERIAL}=="Raspberry_Pi_Pico_CR100_E6...33", ENV{ID_USB_INTERFACE_NUM}=="00", SYMLINK+="ttyCR0", ENV{SYSTEMD_WANTS}+="serial-getty@ttyCR0.service"
+```
+
+Create the service file, editing it to change `$TERM` to `vt100-w` (or `cr100` if installed), and then enable the service:
+```
+cp /usr/lib/systemd/system/serial-getty@.service /etc/systemd/system/serial-getty@ttyCR0.service
+vi /etc/systemd/system/serial-getty@ttyCR0.service
+systemctl enable serial-getty@ttyCR0.service
+```
+
+Restart udev:
+```
+systemctl restart udev
+```
+
+Plug in the Pico board. You should get a login prompt on the terminal. If not, well, you get to debug USB & systemd now. These steps worked on my Debian Bookworm system, but literally they work every other time. :-/
+
 # License
 
 All my original code is available under the MIT license.

@@ -7,7 +7,7 @@ project(pico_examples C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-add_compile_options(-Wall -O2 -DPICO_STDIO_DEFAULT_CRLF=0)
+add_compile_options(-Wall -O2 -DPICO_STDIO_DEFAULT_CRLF=0 -DUSBD_PRODUCT=\"Pico\ CR100\")
 
 pico_sdk_init()
 

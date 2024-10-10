@@ -22,3 +22,9 @@ uf2: | build/Makefile
 flash: build/cr100.uf2
 	$(MAKE) -C build
 	_douf2 RPI-RP2 build/cr100.uf2 /dev/serial/by-id/usb-Raspberry_Pi_Pico_*-if00
+
+# Note: use `sudo install-terminfo` or similar to install systemwide.
+# tic writes to the systemwide database if permitted, otherwise to the per-user
+# database.
+install-terminfo:
+	tic -v cr100.terminfo
