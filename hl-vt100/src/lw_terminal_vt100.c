@@ -1041,6 +1041,9 @@ static void vt100_write_unicode(struct lw_terminal *term_emul, int c) {
         vt100->selected_charset = 1;
         return ;
     }
+    if (c < ' ') {
+        return;
+    }
     if (vt100->x == vt100->width)
     {
         if (MODE_IS_SET(vt100, DECAWM))
