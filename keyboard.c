@@ -38,7 +38,6 @@ static int parity(int x) {
 }
 static void kbd_write_blocking(int value) {
     value = value | (parity(value) << 8);
-    scrnprintf("sm put %03x\r\n", value);
     pio_sm_put_blocking(kbd_pio, kbd_sm, value);
 }
 
@@ -355,6 +354,7 @@ void keyboard_poll(queue_t *q) {
 }
 
 void keyboard_leds(int value) {
+    return;
     if (value != pending_led_value) {
         pending_led_value = value;
         pending_led_flag = true;
