@@ -211,13 +211,19 @@ static stdio_driver_t stdio_kbd = {
 };
 #endif
 
+static
+void master_write(void *user_data, void *buffer_in, size_t len) {
+    const char *buffer = buffer_in;
+    for(;len--;buffer++) { putchar(*buffer); }
+}
+
 int main(void) {
 #if !STANDALONE
     set_sys_clock_khz(vga_660x477_60_sys_clock_khz, false);
     stdio_init_all();
 #endif
 
-    vt100 = lw_terminal_vt100_init(NULL, NULL, char_attr, FB_WIDTH_CHAR, FB_HEIGHT_CHAR);
+    vt100 = lw_terminal_vt100_init(NULL, NULL, master_write, char_attr, FB_WIDTH_CHAR, FB_HEIGHT_CHAR);
     multicore_launch_core1(core1_entry);
 
     scrnprintf(

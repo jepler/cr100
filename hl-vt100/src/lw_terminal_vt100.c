@@ -1098,6 +1098,7 @@ static void setcells(lw_cell_t *buf, lw_cell_t c, size_t n) {
 
 struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
                                      void (*unimplemented)(struct lw_terminal* term_emul, char *seq, char chr),
+                                     void (*master_write)(void *user_data, void *buffer, size_t len),
                                      lw_cell_t (*encode_attr)(void *user_data, const struct lw_parsed_attr *attr),
                                      unsigned int width, unsigned int height)
 {
@@ -1154,6 +1155,7 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
     this->lw_terminal->callbacks.esc.n7 = DECSC;
     this->lw_terminal->callbacks.hash.n8 = DECALN;
     this->lw_terminal->unimplemented = unimplemented;
+    this->master_write = master_write;
     this->encode_attr = encode_attr ? encode_attr : default_encode_attr;
     lw_terminal_vt100_read_str(this, "\033[m"); // set default attributes
     setcells(this->ascreen, ' ' | this->attr, 132 * SCROLLBACK * this->height);

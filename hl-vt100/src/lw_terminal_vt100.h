@@ -112,6 +112,7 @@ struct lw_terminal_vt100
 struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
                                      void (*unimplemented)(struct lw_terminal* term_emul,
                                                            char *seq, char chr),
+                                     void (*master_write)(void *user_data, void *buffer, size_t len),
                                      lw_cell_t (*encode_attr)(void *user_data,
                                                          const struct lw_parsed_attr *attr),
                                      unsigned int width, unsigned int height);
