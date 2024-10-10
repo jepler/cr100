@@ -95,7 +95,6 @@ bool keyboard_setup(PIO pio) {
     return ok;
 }
 
-enum { LED_NUM = 4, LED_CAPS = 2 };
 
 enum { LSHIFT=1, LCTRL=2, LALT=4, RSHIFT = 8, RCTRL = 16, RALT = 32, MOD_CAPS=64, MOD_NUM = 128, TOGGLING_MODIFIERS = MOD_CAPS | MOD_NUM };
 const char keyboard_modifiers[256] = {
@@ -282,7 +281,7 @@ void queue_handle_event(queue_t *q, bool release, int value) {
         if(release) {
             if (modifiers & TOGGLING_MODIFIERS) {
                 current_modifiers ^= modifiers;
-                keyboard_leds(
+                keyboard_set_leds(
                         ((current_modifiers & MOD_NUM) ? LED_NUM : 0) |
                         ((current_modifiers & MOD_CAPS) ? LED_CAPS : 0));
             } else {
@@ -353,7 +352,10 @@ void keyboard_poll(queue_t *q) {
     }
 }
 
-void keyboard_leds(int value) {
+int keyboard_leds;
+
+void keyboard_set_leds(int value) {
+    keyboard_leds = value;
     return;
     if (value != pending_led_value) {
         pending_led_value = value;

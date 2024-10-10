@@ -83,10 +83,32 @@ uint16_t chargen[256*CHAR_Y] = {
 #include "5x9.h"
 };
 
-int cx, cy, attr = 0x300;
-
 _Static_assert(FB_WIDTH_CHAR % 6 == 0);
 
+lw_cell_t statusline[FB_WIDTH_CHAR] = { 0x300 | 'h', 0x300 | 'i', 0x300 | 'm', 0x300 | 'o', 0x300 | 'm' };
+
+static
+int status_printf(const char *fmt, ...) {
+    char buf[2*FB_WIDTH_CHAR + 1];
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    int attr = 0x300;
+    int i, j;
+    for(i=j=0; j < FB_WIDTH_CHAR && buf[i]; i++) {
+        int c = (unsigned char)buf[i];
+        if (c < 32) {
+            attr = c << 8;
+        } else {
+            statusline[j++] = c | attr;
+        }
+    }
+    while(j < FB_WIDTH_CHAR) {
+        statusline[j++] = 32 | attr;
+    }
+    return n;
+}
 int scrnprintf(const char *fmt, ...) {
     char *ptr;
     va_list ap;
@@ -128,12 +150,15 @@ static void setup_vga(void) {
     setup_vga_hsync(pio0);
 }
 
+
 __attribute__((noreturn,noinline))
 static void __not_in_flash_func(core1_loop)(void) {
     int frameno = 0;
     while(true) {
         for(int row = 0; row < FB_HEIGHT_CHAR; row++) {
-            uint32_t *chardata = (uint32_t*)lw_terminal_vt100_getline(vt100, row);
+            uint32_t *chardata = row == FB_HEIGHT_CHAR - 1
+                ? (uint32_t*) statusline
+                : (uint32_t*)lw_terminal_vt100_getline(vt100, row);
             for(int j=0; j<CHAR_Y; j++) {
                 scan_convert(chardata,
                     &chargen[256 * j], frameno & 0x20 ? base_shade : base_shade + 4);
@@ -217,13 +242,14 @@ void master_write(void *user_data, void *buffer_in, size_t len) {
     for(;len--;buffer++) { putchar(*buffer); }
 }
 
+int old_keyboard_leds = ~0;
 int main(void) {
 #if !STANDALONE
     set_sys_clock_khz(vga_660x477_60_sys_clock_khz, false);
     stdio_init_all();
 #endif
 
-    vt100 = lw_terminal_vt100_init(NULL, NULL, master_write, char_attr, FB_WIDTH_CHAR, FB_HEIGHT_CHAR);
+    vt100 = lw_terminal_vt100_init(NULL, NULL, master_write, char_attr, FB_WIDTH_CHAR, FB_HEIGHT_CHAR - 1);
     multicore_launch_core1(core1_entry);
 
     scrnprintf(
@@ -247,6 +273,12 @@ int main(void) {
             char cc = (char)c;
             // avoid CRLF translation
             stdio_put_string(&cc, 1, false, false);
+        }
+        if (keyboard_leds != old_keyboard_leds) {
+            status_printf("\3USB            \2 %s %s",
+                    keyboard_leds & LED_CAPS ? "\22 CAPS \2" : "      ",
+                    keyboard_leds & LED_NUM ? "\22 NUM \2" : "     ");
+            old_keyboard_leds = keyboard_leds;
         }
     }
 

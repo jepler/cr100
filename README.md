@@ -11,7 +11,7 @@ on LCD displays is not recommended. (that said, it does KINDA work for testing)
 
 ## Features
 
- * 132x53 text mode (660x480, VGA 640x480@60Hz compatible timing)
+ * 132x53 text mode (660x480, VGA 640x480@60Hz compatible timing), including 1 status line
  * 4 brightness levels
  * foreground & background colors for each cell
  * blinking text
