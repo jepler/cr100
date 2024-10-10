@@ -98,10 +98,11 @@ struct lw_terminal_vt100
     lw_cell_t    *afrozen_screen;
     char         *tabulations;
     bool         unicode;
+    bool cursor_saved_flag;
     unsigned int selected_charset;
     unsigned int modes;
     struct lw_parsed_attr parsed_attr;
-    lw_cell_t    attr, cursor_saved_cell;
+    lw_cell_t    attr;
     int cursor_saved_x, cursor_saved_y;
     const lw_cell_t    *alines[80];
     void         (*master_write)(void *user_data, void *buffer, size_t len);
