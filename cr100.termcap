@@ -1,3 +1,0 @@
-cr100,
-    cols#132, lines#43,
-    am, clear=\E[H\E[2J, cr=^M, cub1=^H, cup=\E[%i%p1%d;%p2%dH, el=\E[K,
