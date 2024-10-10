@@ -321,6 +321,9 @@ void queue_handle_event(queue_t *q, bool release, int value) {
     if(is_ctrl && CTRLABLE(c)) {
         c = c & 0x1f;
     }
+    if(is_ctrl && c == 010) {
+        c = 0377; // ctrl-backspace = RUBOUT
+    }
 #define IS_ALPHA(c) ((c >= 'a' && c <= 'c') || (c >= 'A' && c <= 'Z'))
     if(is_caps && IS_ALPHA(c)) {
         c ^= ('a' ^ 'A');
