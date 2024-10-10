@@ -1170,6 +1170,7 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
     this->lw_terminal->callbacks.csi.c = DA;
     this->lw_terminal->callbacks.csi.h = SM;
     this->lw_terminal->callbacks.csi.l = RM;
+    this->lw_terminal->callbacks.csi.n = DSR;
     this->lw_terminal->callbacks.csi.J = ED;
     this->lw_terminal->callbacks.csi.H = CUP;
     this->lw_terminal->callbacks.csi.C = CUF;
