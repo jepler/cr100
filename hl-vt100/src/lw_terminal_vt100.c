@@ -356,6 +356,9 @@ static void SGR(struct lw_terminal *term_emul)
 {
     struct lw_terminal_vt100 *vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
 
+    // vim sends "CSI > 4 ; 2 m" and you can't stop it
+    if (term_emul->flag == '>') { return; }
+
     if (term_emul->argc == 0) {
         term_emul->argc = 1;
         term_emul->argv[0] = 0;
