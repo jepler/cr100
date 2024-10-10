@@ -23,6 +23,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -590,6 +591,32 @@ static void DA(struct lw_terminal *term_emul)
 
     vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
     vt100->master_write(vt100->user_data, "\033[?1;0c", 7);
+}
+
+static void DSR(struct lw_terminal *term_emul)
+{
+    struct lw_terminal_vt100 *vt100;
+    vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
+
+    if (!term_emul->argc) {
+        return;
+    }
+
+    switch(term_emul->argv[0]) {
+        case 5:
+            vt100->master_write(vt100->user_data, "\033[0n", 4);
+            break;
+        
+        case 6:
+            {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "\033[%d;%dR", vt100->y + 1, vt100->x + 1);
+                vt100->master_write(vt100->user_data, buf, strlen(buf));
+            }
+
+        default:
+            ;
+    }
 }
 
 /*
