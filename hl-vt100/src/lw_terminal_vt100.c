@@ -201,9 +201,9 @@ static void aset(struct lw_terminal_vt100 *headless_term,
                 lw_cell_t c)
 {
     if (y < headless_term->margin_top || y > headless_term->margin_bottom)
-        headless_term->afrozen_screen[FROZEN_SCREEN_PTR(headless_term, x, y)] = c | headless_term->attr;
+        headless_term->afrozen_screen[FROZEN_SCREEN_PTR(headless_term, x, y)] = c;
     else
-        headless_term->ascreen[SCREEN_PTR(headless_term, x, y)] = c | headless_term->attr;
+        headless_term->ascreen[SCREEN_PTR(headless_term, x, y)] = c;
 }
 
 static void set(struct lw_terminal_vt100 *headless_term,        
