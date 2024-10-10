@@ -244,7 +244,9 @@ int main(void) {
         }
         c = kbd_getc_nonblocking();
         if (c != EOF) {
-            putchar(c);
+            char cc = (char)c;
+            // avoid CRLF translation
+            stdio_put_string(&cc, 1, false, false);
         }
     }
 
