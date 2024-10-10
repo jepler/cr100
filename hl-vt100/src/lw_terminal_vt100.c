@@ -464,6 +464,8 @@ static void CUP(struct lw_terminal *term_emul)
         if ((unsigned int)arg0 > vt100->margin_bottom)
             arg0 = vt100->margin_bottom;
     }
+    if (arg0 >= vt100->height) { arg0 = vt100->height - 1; }
+    if (arg1 >= vt100->width) { arg1 = vt100->width - 1; }
     vt100->y = arg0;
     vt100->x = arg1;
 }
