@@ -94,7 +94,7 @@ bool keyboard_setup(PIO pio) {
     return ok;
 }
 
-enum { LED_NUM = 1, LED_CAPS = 2 };
+enum { LED_NUM = 4, LED_CAPS = 2 };
 
 enum { LSHIFT=1, LCTRL=2, LALT=4, RSHIFT = 8, RCTRL = 16, RALT = 32, MOD_CAPS=64, MOD_NUM = 128, TOGGLING_MODIFIERS = MOD_CAPS | MOD_NUM };
 const char keyboard_modifiers[256] = {
