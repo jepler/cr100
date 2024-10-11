@@ -179,7 +179,7 @@ void lw_terminal_parser_read(struct lw_terminal *this, char c)
     {
         if (c == '?')
             this->flag = '?';
-        if (c == '>')
+        else if (c == '>')
             this->flag = '>';
         else if (c == ';' || (c >= '0' && c <= '9'))
             lw_terminal_parser_push(this, c);
