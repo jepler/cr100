@@ -864,6 +864,36 @@ static void CUB(struct lw_terminal *term_emul)
 }
 
 /*
+  DCH - Delete character(s) [default: 1]
+
+  ESC [ Ps P        default value: 1
+
+*/
+static void DCH(struct lw_terminal *term_emul)
+{
+    struct lw_terminal_vt100 *vt100;
+    unsigned int arg0;
+    unsigned int x;
+    unsigned int y;
+
+    vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
+    arg0 = 1;
+    y = vt100->y;
+
+    if (term_emul->argc > 0)
+        arg0 = term_emul->argv[0];
+
+    for (x = vt100->x; x < vt100->width; ++x) {
+        int x1 = x + arg0;
+        if (x1 >= vt100->width) {
+            set(vt100, x, y, ' ');
+        } else {
+            aset(vt100, x, y, aget(vt100, x1, y));
+        }
+    }
+}
+
+/*
   ED – Erase In Display
 
   ESC [ Ps J        default value: 0
@@ -1181,6 +1211,7 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
     this->lw_terminal->callbacks.csi.r = DECSTBM;
     this->lw_terminal->callbacks.csi.m = SGR;
     this->lw_terminal->callbacks.csi.A = CUU;
+    this->lw_terminal->callbacks.csi.P = DCH;
     this->lw_terminal->callbacks.csi.g = TBC;
     this->lw_terminal->callbacks.esc.H = HTS;
     this->lw_terminal->callbacks.csi.D = CUB;
