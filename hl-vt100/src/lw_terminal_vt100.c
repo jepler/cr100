@@ -1184,8 +1184,9 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
     this->tabulations = malloc(132);
     if (this->tabulations == NULL)
         goto free_frozen_screen;
-    if (this->tabulations == NULL)
-        return NULL;
+    for(int i=0; i<132; i++) {
+        this->tabulations[i] = (i && i % 8 == 0) ? '|' : '-';
+    }
     this->margin_top = 0;
     this->margin_bottom = this->height - 1;
     this->selected_charset = 1;
