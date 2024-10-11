@@ -9,7 +9,9 @@
 #include "pico/stdlib.h"
 #include "pico/stdio/driver.h"
 #include "pico/multicore.h"
+#include "pico/bootrom.h"
 #include "hardware/structs/mpu.h"
+#include "hardware/watchdog.h"
 #include "hardware/clocks.h"
 #include "cmsis_compiler.h"
 #include "RP2040.h"
@@ -85,7 +87,7 @@ uint16_t chargen[256*CHAR_Y] = {
 
 _Static_assert(FB_WIDTH_CHAR % 6 == 0);
 
-lw_cell_t statusline[FB_WIDTH_CHAR] = { 0x300 | 'h', 0x300 | 'i', 0x300 | 'm', 0x300 | 'o', 0x300 | 'm' };
+lw_cell_t statusline[FB_WIDTH_CHAR];
 
 static
 int status_printf(const char *fmt, ...) {
@@ -211,11 +213,232 @@ static lw_cell_t char_attr(void *user_data, const struct lw_parsed_attr *attr) {
 queue_t keyboard_queue;
 
 static
+void reset_cpu(void) {
+    watchdog_reboot(0, SRAM_END, 0);
+    watchdog_start_tick(12);
+
+    while (true) {
+        __wfi();
+    }
+}
+
+int current_port;
+
+#define COUNT_OF(x) ((sizeof(x) / sizeof((x)[0])))
+
+uint baudrates[] = { 300, 1200, 2400, 9600, 19200, 38400, 115200 };
+#define N_BAUDRATES (COUNT_OF(baudrates))
+
+typedef struct {
+    uint data_bits, stop_bits;
+    uart_parity_t parity;
+    const char *label;
+} uart_config_t;
+
+const uart_config_t uart_configs[] = {
+    { 8, 1, UART_PARITY_NONE, "8N1" },
+    { 8, 2, UART_PARITY_NONE, "8N2" },
+    { 8, 1, UART_PARITY_EVEN, "8E1" },
+    { 8, 1, UART_PARITY_ODD, "8O1" },
+    { 7, 1, UART_PARITY_NONE, "7N1" },
+    { 7, 2, UART_PARITY_NONE, "7N2" },
+    { 7, 1, UART_PARITY_EVEN, "7E1" },
+    { 7, 1, UART_PARITY_ODD, "7O1" },
+};
+#define N_CONFIGS (COUNT_OF(uart_configs))
+
+typedef struct uart_data {
+    int uart, tx, rx, baud_idx, cfg_idx;
+} uart_data_t;
+
+uart_data_t uart_data[] = {
+    { 0, 0, 1 },
+    { 0, 12, 13 },
+};
+#define N_UARTS (COUNT_OF(uart_data))
+
+static void uart_activate(void *data_in) {
+    uart_data_t *data = (uart_data_t *)data_in;
+    uart_inst_t *inst = uart_get_instance(data->uart);
+    uart_init(inst, baudrates[data->baud_idx]);
+    const uart_config_t *config = &uart_configs[data->cfg_idx];
+    uart_set_format(inst, config->data_bits, config->stop_bits, config->parity);
+    uart_set_fifo_enabled(inst, true);
+    gpio_set_function(data->rx, UART_FUNCSEL_NUM(inst, data->rx));
+    gpio_set_function(data->tx, UART_FUNCSEL_NUM(inst, data->tx));
+    gpio_pull_up(data->rx);
+
+}
+
+static void uart_deactivate(void *data_in) {
+    uart_data_t *data = (uart_data_t *)data_in;
+    gpio_init(data->rx);
+    gpio_init(data->tx);
+    gpio_pull_up(data->tx);
+}
+
+static int uart_getc_nonblocking(void *data_in) {
+    uart_data_t *data = (uart_data_t *)data_in;
+    uart_inst_t *inst = uart_get_instance(data->uart);
+    if (!uart_is_readable(inst)) { return EOF; }
+    return uart_getc(inst);
+}
+
+static void uart_putc_nonblocking(void *data_in, int c) {
+    uart_data_t *data = (uart_data_t *)data_in;
+    uart_inst_t *inst = uart_get_instance(data->uart);
+    if (uart_is_writable(inst)) { uart_putc_raw(inst, c); }
+}
+
+static void uart_cycle_baud_rate(void *data_in) {
+    uart_data_t *data = (uart_data_t *)data_in;
+    uart_inst_t *inst = uart_get_instance(data->uart);
+    data->baud_idx = (data->baud_idx + 1) % N_BAUDRATES;
+    uart_set_baudrate(inst, baudrates[data->baud_idx]);
+}
+
+static void uart_cycle_settings(void *data_in) {
+    uart_data_t *data = (uart_data_t *)data_in;
+    uart_inst_t *inst = uart_get_instance(data->uart);
+    data->cfg_idx = (data->cfg_idx + 1) % N_CONFIGS;
+    const uart_config_t *config = &uart_configs[data->cfg_idx];
+    uart_set_format(inst, config->data_bits, config->stop_bits, config->parity);
+}
+
+static void uart_describe(void *data_in, char *buf, size_t buflen) {
+    uart_data_t *data = (uart_data_t *)data_in;
+    const uart_config_t *config = &uart_configs[data->cfg_idx];
+    snprintf(buf, buflen, "UART%d %5d %s", current_port, baudrates[data->baud_idx], config->label);
+}
+
+static void usb_activate(void *data) {}
+
+static void usb_deactivate(void *data) {}
+static int usb_getc_nonblocking(void *data) {
+    int c = getchar_timeout_us(1);
+    return (c < 0) ? EOF : c;
+}
+static void usb_putc_nonblocking(void *data, int c) {
+    stdio_putchar_raw(c);
+}
+
+static void usb_cycle_baud_rate(void *data) {}
+static void usb_cycle_settings(void *data) {}
+static void usb_describe(void *data, char *buf, size_t buflen) {
+    snprintf(buf, buflen, "%-15s", "USB");
+}
+
+typedef struct {
+    void *data;
+    void (*activate)(void *data);
+    void (*deactivate)(void *data);
+    int (*getc_nonblocking)(void *data);
+    void (*putc_nonblocking)(void *data, int c);
+    void (*cycle_baud_rate)(void *data);
+    void (*cycle_settings)(void *data);
+    void (*describe)(void *data, char *buf, size_t buflen);
+} port_descr_t;
+static const port_descr_t ports[] = {
+    {
+        .data = NULL,
+        .activate = usb_activate,
+        .deactivate = usb_deactivate,
+        .getc_nonblocking = usb_getc_nonblocking,
+        .putc_nonblocking = usb_putc_nonblocking,
+        .cycle_baud_rate = usb_cycle_baud_rate,
+        .cycle_settings = usb_cycle_settings,
+        .describe = usb_describe,
+    },
+    {
+        .data = &uart_data[0],
+        .activate = uart_activate,
+        .deactivate = uart_deactivate,
+        .getc_nonblocking = uart_getc_nonblocking,
+        .putc_nonblocking = uart_putc_nonblocking,
+        .cycle_baud_rate = uart_cycle_baud_rate,
+        .cycle_settings = uart_cycle_settings,
+        .describe = uart_describe,
+    },
+    {
+        .data = &uart_data[1],
+        .activate = uart_activate,
+        .deactivate = uart_deactivate,
+        .getc_nonblocking = uart_getc_nonblocking,
+        .putc_nonblocking = uart_putc_nonblocking,
+        .cycle_baud_rate = uart_cycle_baud_rate,
+        .cycle_settings = uart_cycle_settings,
+        .describe = uart_describe,
+    },
+};
+#define NUM_PORTS (COUNT_OF(ports))
+
+
+#define CURRENT_PORT (ports[current_port])
+
+static bool status_refresh = true;
+static void refresh_status(void) { status_refresh = true; }
+
+static void port_deactivate(void) {
+    CURRENT_PORT.deactivate(CURRENT_PORT.data);
+}
+
+static void port_activate(void) {
+    CURRENT_PORT.activate(CURRENT_PORT.data);
+}
+
+static int port_getc(void) {
+    return CURRENT_PORT.getc_nonblocking(CURRENT_PORT.data);
+}
+
+static void port_putc(int c) {
+    return CURRENT_PORT.putc_nonblocking(CURRENT_PORT.data, c);
+}
+
+static void port_cycle_baud_rate(void) {
+    refresh_status();
+    CURRENT_PORT.cycle_baud_rate(CURRENT_PORT.data);
+}
+
+static void port_cycle_settings(void) {
+    refresh_status();
+    CURRENT_PORT.cycle_settings(CURRENT_PORT.data);
+}
+
+static char *port_describe(void) {
+    static char buf[24];
+    CURRENT_PORT.describe(CURRENT_PORT.data, buf, sizeof(buf));
+    return buf;
+}
+
+static void switch_port(void) {
+    port_deactivate();
+    current_port = (current_port + 1) % NUM_PORTS;
+    refresh_status();
+    port_activate();
+}
+
+static
 int stdio_kbd_in_chars(char *buf, int length) {
     int rc = 0;
     int code;
     keyboard_poll(&keyboard_queue);
     while (length && queue_try_remove(&keyboard_queue, &code)) {
+        if ((code & 0xc000) == 0xc000) {
+            switch(code) {
+                case CMD_SWITCH_RATE:
+                    port_cycle_baud_rate();
+                    break;
+                case CMD_SWITCH_SETTINGS:
+                    port_cycle_settings();
+                    break;
+                case CMD_SWITCH_PORT:
+                    switch_port();
+                    break;
+                case CMD_REBOOT:
+                    reset_cpu();
+            }
+            continue;
+        }
         *buf++ = code;
         length--;
         rc++;
@@ -239,23 +462,24 @@ static stdio_driver_t stdio_kbd = {
 static
 void master_write(void *user_data, void *buffer_in, size_t len) {
     const char *buffer = buffer_in;
-    for(;len--;buffer++) { putchar(*buffer); }
+    for(;len--;buffer++) { port_putc(*buffer); }
 }
 
-int old_keyboard_leds = ~0;
+static int old_keyboard_leds;
 int main(void) {
 #if !STANDALONE
     set_sys_clock_khz(vga_660x477_60_sys_clock_khz, false);
     stdio_init_all();
 #endif
+    for(int i=0; i<N_UARTS; i++) {
+        gpio_init(uart_data[i].tx);
+        gpio_pull_up(uart_data[i].tx);
+    }
 
     vt100 = lw_terminal_vt100_init(NULL, NULL, master_write, char_attr, FB_WIDTH_CHAR, FB_HEIGHT_CHAR - 1);
     multicore_launch_core1(core1_entry);
 
-    scrnprintf(
-"(line 0)\r\n"
-"CR100 terminal demo...\r\n"
-);
+    scrnprintf(" \r");
 
     if (keyboard_setup(pio1)) {
         queue_init(&keyboard_queue, sizeof(int), 64);
@@ -263,22 +487,26 @@ int main(void) {
     }
 
     while (true) {
-        int c = getchar_timeout_us(10);
+        int c = port_getc();
         if (c > 0) {
             char cc = c;
             lw_terminal_vt100_read_buf(vt100, &cc, 1);
         }
         c = kbd_getc_nonblocking();
         if (c != EOF) {
-            char cc = (char)c;
-            // avoid CRLF translation
-            stdio_put_string(&cc, 1, false, false);
+            port_putc(c);
         }
         if (keyboard_leds != old_keyboard_leds) {
-            status_printf("\3USB            \2 %s %s",
+            status_refresh = true;
+            old_keyboard_leds = keyboard_leds;
+        }
+
+        if (status_refresh) {
+            status_printf("\3%s\3 \2 %s %s",
+                    port_describe(),
                     keyboard_leds & LED_CAPS ? "\22 CAPS \2" : "      ",
                     keyboard_leds & LED_NUM ? "\22 NUM \2" : "     ");
-            old_keyboard_leds = keyboard_leds;
+            status_refresh = false;
         }
     }
 

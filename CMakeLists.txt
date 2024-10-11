@@ -32,6 +32,7 @@ target_compile_options(cr100 PRIVATE
 target_include_directories(cr100 PRIVATE hl-vt100/src ${CMAKE_CURRENT_LIST_DIR})
 
 pico_enable_stdio_usb(cr100 1)
+pico_enable_stdio_uart(cr100 0)
 
 
 

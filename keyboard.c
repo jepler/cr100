@@ -171,6 +171,7 @@ const char *const symtab[MAX_SYMBOLS] = {
 };
 
 #define SYM(x) (0x8000 | (int)(x))
+#define CMD(x) (0xc000 | (int)(x))
 #define CHAR2(c, d) (int) c | (((int) d) << 8)
 #define CHAR2(c, d) (int) c | (((int) d) << 8)
 #define ALPHA(c) CHAR2(c, c ^ ('a' ^ 'A'))
@@ -179,7 +180,7 @@ const char *const symtab[MAX_SYMBOLS] = {
 #define LO(x) (x & 0xff)
 #define HI(x) ((x >> 8) & 0xff)
 
-const int16_t keyboard_codes[256] = {
+const uint16_t keyboard_codes[256] = {
     [0x08] = '\033',
     [0x07] = SYM(F1),
     [0x0f] = SYM(F2),
@@ -269,12 +270,12 @@ const int16_t keyboard_codes[256] = {
 bool pending_release;
 int current_modifiers = 0;
 
-static void queue_add_char(queue_t *q, int data) {
+static void queue_add_data(queue_t *q, int data) {
     (void)queue_try_add(q, &data);
 }
 
 static void queue_add_str(queue_t *q, const char *s) {
-    while(*s) queue_add_char(q, *s++);
+    while(*s) queue_add_data(q, *s++);
 }
 
 
@@ -313,7 +314,28 @@ void queue_handle_event(queue_t *q, bool release, int value) {
         return;
     }
 
+    if((kc & 0xc000) == 0xc000) {
+        queue_add_data(q, kc);
+        return;
+    }
+
     if(kc & 0x8000) {
+        int sym = kc & 0x7fff;
+        if(is_ctrl && is_alt) {
+            if (sym == DELETE) {
+                queue_add_data(q, CMD_REBOOT);
+            }
+            if (sym == F1) {
+                queue_add_data(q, CMD_SWITCH_PORT);
+            }
+            if (sym == F2) {
+                queue_add_data(q, CMD_SWITCH_RATE);
+            }
+            if (sym == F3) {
+                queue_add_data(q, CMD_SWITCH_SETTINGS);
+            }
+            return;
+        }
         queue_add_str(q, symtab[kc & 0x7fff]);
         return;
     }
@@ -328,14 +350,14 @@ void queue_handle_event(queue_t *q, bool release, int value) {
     if(is_ctrl && c == 010) {
         c = 0377; // ctrl-backspace = RUBOUT
     }
-#define IS_ALPHA(c) ((c >= 'a' && c <= 'c') || (c >= 'A' && c <= 'Z'))
+#define IS_ALPHA(c) ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
     if(is_caps && IS_ALPHA(c)) {
         c ^= ('a' ^ 'A');
     }
     if(is_alt) {
-        queue_add_char(q, '\033');
+        queue_add_data(q, '\033');
     }
-    queue_add_char(q, c);
+    queue_add_data(q, c);
 }
 
 void keyboard_poll(queue_t *q) {
