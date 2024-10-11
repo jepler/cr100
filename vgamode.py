@@ -283,6 +283,8 @@ static inline void {program_name_base}_pixel_program_init(PIO pio, uint sm, uint
 
     // Set this pin's GPIO function (connect PIO to the pad)
     for(uint i=0; i<n_pin; i++) {{
+        gpio_set_slew_rate(pin + i, GPIO_SLEW_RATE_FAST);
+        gpio_set_drive_strength(pin + i, GPIO_DRIVE_STRENGTH_8MA);
         pio_gpio_init(pio, pin + i);
     }}
     // Set the pin direction to output at the PIO
