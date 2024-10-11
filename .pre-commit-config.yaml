@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2020 Diego Elio Pettenò
+#
+# SPDX-License-Identifier: Unlicense
+
+# CIRCUITPY-CHANGE: CircuitPython-specific.
+
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.0.1
+  hooks:
+  - id: check-yaml
+  - id: end-of-file-fixer
+  - id: trailing-whitespace
+- repo: https://github.com/codespell-project/codespell
+  rev: v2.2.4
+  hooks:
+  - id: codespell
+    args: [-w]
+    exclude: |
+      (?x)^(
+        hl-vt100
+      )
+- repo: https://github.com/pre-commit/mirrors-clang-format
+  rev: v14.0.6
+  hooks:
+  - id: clang-format
+    exclude: 5x9.h
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.6.2
+  hooks:
+    # Run the linter.
+    - id: ruff
+      args: [ --fix ]
+    # Run the formatter.
+    - id: ruff-format

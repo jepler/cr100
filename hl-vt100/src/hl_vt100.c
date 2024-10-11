@@ -24,26 +24,20 @@
  */
 
 #define _XOPEN_SOURCE
-#include <errno.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <pty.h>
-#include <stdlib.h>
 #include "hl_vt100.h"
+#include <errno.h>
+#include <pty.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-struct vt100_headless *new_vt100_headless(void)
-{
+struct vt100_headless *new_vt100_headless(void) {
     return calloc(1, sizeof(struct vt100_headless));
 }
 
-void delete_vt100_headless(struct vt100_headless *this)
-{
-    free(this);
-}
+void delete_vt100_headless(struct vt100_headless *this) { free(this); }
 
-static void set_non_canonical(struct vt100_headless *this, int fd)
-{
+static void set_non_canonical(struct vt100_headless *this, int fd) {
     struct termios termios;
 
     ioctl(fd, TCGETS, &this->backup);
@@ -54,16 +48,13 @@ static void set_non_canonical(struct vt100_headless *this, int fd)
     ioctl(fd, TCSETS, &termios);
 }
 
-static void restore_termios(struct vt100_headless *this, int fd)
-{
+static void restore_termios(struct vt100_headless *this, int fd) {
     ioctl(fd, TCSETS, &this->backup);
 }
 
 #ifndef NDEBUG
-static void strdump(char *str)
-{
-    while (*str != '\0')
-    {
+static void strdump(char *str) {
+    while (*str != '\0') {
         if (*str >= ' ' && *str <= '~')
             fprintf(stderr, "%c", *str);
         else
@@ -74,44 +65,34 @@ static void strdump(char *str)
 }
 #endif
 
-void vt100_headless_stop(struct vt100_headless *this)
-{
-    this->should_quit = 1;
-}
+void vt100_headless_stop(struct vt100_headless *this) { this->should_quit = 1; }
 
-int vt100_headless_main_loop(struct vt100_headless *this)
-{
+int vt100_headless_main_loop(struct vt100_headless *this) {
     char buffer[4096];
     fd_set rfds;
     int retval;
     ssize_t read_size;
 
-    while (!this->should_quit)
-    {
+    while (!this->should_quit) {
         FD_ZERO(&rfds);
         FD_SET(this->master, &rfds);
         FD_SET(0, &rfds);
         retval = select(this->master + 1, &rfds, NULL, NULL, NULL);
-        if (retval == -1)
-        {
+        if (retval == -1) {
             perror("select()");
         }
-        if (FD_ISSET(0, &rfds))
-        {
+        if (FD_ISSET(0, &rfds)) {
             read_size = read(0, &buffer, 4096);
-            if (read_size == -1)
-            {
+            if (read_size == -1) {
                 perror("read");
                 return EXIT_FAILURE;
             }
             buffer[read_size] = '\0';
             write(this->master, buffer, read_size);
         }
-        if (FD_ISSET(this->master, &rfds))
-        {
+        if (FD_ISSET(this->master, &rfds)) {
             read_size = read(this->master, &buffer, 4096);
-            if (read_size == -1)
-            {
+            if (read_size == -1) {
                 if (errno == EIO) {
                     return EXIT_SUCCESS;
                 }
@@ -130,23 +111,19 @@ int vt100_headless_main_loop(struct vt100_headless *this)
     return EXIT_SUCCESS;
 }
 
-void master_write(void *user_data, void *buffer, size_t len)
-{
+void master_write(void *user_data, void *buffer, size_t len) {
     struct vt100_headless *this;
 
-    this = (struct vt100_headless*)user_data;
+    this = (struct vt100_headless *)user_data;
     write(this->master, buffer, len);
 }
 
-const lw_cell_t **vt100_headless_getlines(struct vt100_headless *this)
-{
+const lw_cell_t **vt100_headless_getlines(struct vt100_headless *this) {
     return lw_terminal_vt100_getlines(this->term);
 }
 
-void vt100_headless_fork(struct vt100_headless *this,
-                         const char *progname,
-                         char **argv)
-{
+void vt100_headless_fork(struct vt100_headless *this, const char *progname,
+                         char **argv) {
     int child;
     struct winsize winsize;
 
@@ -154,16 +131,15 @@ void vt100_headless_fork(struct vt100_headless *this,
     winsize.ws_row = 24;
     winsize.ws_col = 80;
     child = forkpty(&this->master, NULL, NULL, NULL);
-    if (child == CHILD)
-    {
+    if (child == CHILD) {
         setsid();
         putenv("TERM=vt100");
         execvp(progname, argv);
-        return ;
-    }
-    else
-    {
-        this->term = lw_terminal_vt100_init(this, lw_terminal_parser_default_unimplemented, master_write, NULL, winsize.ws_col, winsize.ws_row);
+        return;
+    } else {
+        this->term = lw_terminal_vt100_init(
+            this, lw_terminal_parser_default_unimplemented, master_write, NULL,
+            winsize.ws_col, winsize.ws_row);
         ioctl(this->master, TIOCSWINSZ, &winsize);
     }
     restore_termios(this, 0);

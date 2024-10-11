@@ -23,23 +23,21 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include <unistd.h>
-#include <utmp.h>
-#include <string.h>
+#include "hl_vt100.h"
 #include <pty.h>
 #include <stdio.h>
-#include "hl_vt100.h"
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <utmp.h>
 
-void disp(struct vt100_headless *vt100)
-{
+void disp(struct vt100_headless *vt100) {
     unsigned int x, y;
     const lw_cell_t **lines;
 
     lines = vt100_headless_getlines(vt100);
     write(1, "\n", 1);
-    for (y = 0; y < vt100->term->height; ++y)
-    {
+    for (y = 0; y < vt100->term->height; ++y) {
         write(1, "|", 1);
         for (x = 0; x < vt100->term->width; x++) {
             write(1, &lines[y][x], 1);
@@ -48,12 +46,10 @@ void disp(struct vt100_headless *vt100)
     }
 }
 
-int main(int ac, char **av)
-{
+int main(int ac, char **av) {
     struct vt100_headless *vt100_headless;
 
-    if (ac == 1)
-    {
+    if (ac == 1) {
         puts("Usage: test PROGNAME");
         return EXIT_FAILURE;
     }

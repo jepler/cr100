@@ -23,27 +23,36 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include "lw_terminal_vt100.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
-static unsigned int get_mode_mask(unsigned int mode)
-{
-    switch (mode)
-    {
-    case LNM     : return MASK_LNM;
-    case DECCKM  : return MASK_DECCKM;
-    case DECANM  : return MASK_DECANM;
-    case DECCOLM : return MASK_DECCOLM;
-    case DECSCLM : return MASK_DECSCLM;
-    case DECSCNM : return MASK_DECSCNM;
-    case DECOM   : return MASK_DECOM;
-    case DECAWM  : return MASK_DECAWM;
-    case DECARM  : return MASK_DECARM;
-    case DECINLM : return MASK_DECINLM;
-    default:       return 0;
+static unsigned int get_mode_mask(unsigned int mode) {
+    switch (mode) {
+    case LNM:
+        return MASK_LNM;
+    case DECCKM:
+        return MASK_DECCKM;
+    case DECANM:
+        return MASK_DECANM;
+    case DECCOLM:
+        return MASK_DECCOLM;
+    case DECSCLM:
+        return MASK_DECSCLM;
+    case DECSCNM:
+        return MASK_DECSCNM;
+    case DECOM:
+        return MASK_DECOM;
+    case DECAWM:
+        return MASK_DECAWM;
+    case DECARM:
+        return MASK_DECARM;
+    case DECINLM:
+        return MASK_DECINLM;
+    default:
+        return 0;
     }
 }
 
@@ -179,63 +188,57 @@ static unsigned int get_mode_mask(unsigned int mode)
 
 #define MOD1(a, b) ((a < b) ? a : a - b)
 
-#define SCREEN_PTR(vt100, x, y)                                 \
-    MOD1((vt100->top_line * vt100->width + x + vt100->width * y),   \
-       (vt100->width * SCROLLBACK * vt100->height))
+#define SCREEN_PTR(vt100, x, y)                                                \
+    MOD1((vt100->top_line * vt100->width + x + vt100->width * y),              \
+         (vt100->width * SCROLLBACK * vt100->height))
 
-#define FROZEN_SCREEN_PTR(vt100, x, y)              \
-    (MOD1(x + vt100->width * y,                        \
-       (vt100->width * SCROLLBACK * vt100->height)))
+#define FROZEN_SCREEN_PTR(vt100, x, y)                                         \
+    (MOD1(x + vt100->width * y, (vt100->width * SCROLLBACK * vt100->height)))
 
-static lw_cell_t aget(struct lw_terminal_vt100 *headless_term,
-                unsigned int x, unsigned int y)
-{
+static lw_cell_t aget(struct lw_terminal_vt100 *headless_term, unsigned int x,
+                      unsigned int y) {
     if (y < headless_term->margin_top || y > headless_term->margin_bottom)
-        return headless_term->afrozen_screen[FROZEN_SCREEN_PTR(headless_term, x, y)];
+        return headless_term
+            ->afrozen_screen[FROZEN_SCREEN_PTR(headless_term, x, y)];
     else
         return headless_term->ascreen[SCREEN_PTR(headless_term, x, y)];
 }
 
-static void aset(struct lw_terminal_vt100 *headless_term,
-                unsigned int x, unsigned int y,
-                lw_cell_t c)
-{
+static void aset(struct lw_terminal_vt100 *headless_term, unsigned int x,
+                 unsigned int y, lw_cell_t c) {
     if (y < headless_term->margin_top || y > headless_term->margin_bottom)
-        headless_term->afrozen_screen[FROZEN_SCREEN_PTR(headless_term, x, y)] = c;
+        headless_term->afrozen_screen[FROZEN_SCREEN_PTR(headless_term, x, y)] =
+            c;
     else
         headless_term->ascreen[SCREEN_PTR(headless_term, x, y)] = c;
 }
 
-static void set(struct lw_terminal_vt100 *headless_term,        
-                unsigned int x, unsigned int y,
-                char c) {
-    aset( headless_term, x, y, (unsigned char)c | headless_term->attr);
+static void set(struct lw_terminal_vt100 *headless_term, unsigned int x,
+                unsigned int y, char c) {
+    aset(headless_term, x, y, (unsigned char)c | headless_term->attr);
 }
 
-lw_cell_t lw_terminal_vt100_aget(struct lw_terminal_vt100 *vt100, unsigned int x, unsigned int y)
-{
+lw_cell_t lw_terminal_vt100_aget(struct lw_terminal_vt100 *vt100,
+                                 unsigned int x, unsigned int y) {
     if (y < vt100->margin_top || y > vt100->margin_bottom)
         return vt100->afrozen_screen[FROZEN_SCREEN_PTR(vt100, x, y)];
     else
         return vt100->ascreen[SCREEN_PTR(vt100, x, y)];
 }
 
-static void froze_line(struct lw_terminal_vt100 *vt100, unsigned int y)
-{
+static void froze_line(struct lw_terminal_vt100 *vt100, unsigned int y) {
     memcpy(vt100->afrozen_screen + vt100->width * y,
            vt100->ascreen + SCREEN_PTR(vt100, 0, y),
            vt100->width * sizeof(lw_cell_t));
 }
 
-static void unfroze_line(struct lw_terminal_vt100 *vt100, unsigned int y)
-{
+static void unfroze_line(struct lw_terminal_vt100 *vt100, unsigned int y) {
     memcpy(vt100->ascreen + SCREEN_PTR(vt100, 0, y),
            vt100->afrozen_screen + vt100->width * y,
            vt100->width * sizeof(lw_cell_t));
 }
 
-static void blank_screen(struct lw_terminal_vt100 *lw_terminal_vt100)
-{
+static void blank_screen(struct lw_terminal_vt100 *lw_terminal_vt100) {
     unsigned int x;
     unsigned int y;
 
@@ -252,8 +255,7 @@ static void blank_screen(struct lw_terminal_vt100 *lw_terminal_vt100)
   This sequence causes the cursor position, graphic rendition, and
   character set to be saved. (See DECRC).
 */
-static void DECSC(struct lw_terminal *term_emul)
-{
+static void DECSC(struct lw_terminal *term_emul) {
     /*TODO: Save graphic rendition and charset.*/
     struct lw_terminal_vt100 *vt100;
 
@@ -273,17 +275,14 @@ static void DECSC(struct lw_terminal *term_emul)
   Modes following this section).
 
 */
-static void RM(struct lw_terminal *term_emul)
-{
+static void RM(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     unsigned int mode;
 
     vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
-    if (term_emul->argc > 0)
-    {
+    if (term_emul->argc > 0) {
         mode = term_emul->argv[0];
-        if (mode == DECCOLM)
-        {
+        if (mode == DECCOLM) {
             vt100->width = 80;
             vt100->x = vt100->y = 0;
             blank_screen(vt100);
@@ -335,11 +334,10 @@ x Pm = 97 / 107      fg/bg Bright White
 x Pm = 99 / 109      fg/bg Bright Default
 */
 
-static int default_map_unicode(void *user_data, int c) {
-    return '?';
-}
+static int default_map_unicode(void *user_data, int c) { return '?'; }
 
-static lw_cell_t default_encode_attr(void *user_data, const struct lw_parsed_attr *attr) {
+static lw_cell_t default_encode_attr(void *user_data,
+                                     const struct lw_parsed_attr *attr) {
     (void)user_data;
 
     lw_cell_t result;
@@ -350,29 +348,33 @@ static lw_cell_t default_encode_attr(void *user_data, const struct lw_parsed_att
         result = attr->fg;
         result |= attr->bg << 4;
     }
-    if (attr->bold) result ^= 0x08;
-    if (attr->blink) result ^= 0x80;
+    if (attr->bold)
+        result ^= 0x08;
+    if (attr->blink)
+        result ^= 0x80;
 
     return result << 8;
 }
 
-static void SGR(struct lw_terminal *term_emul)
-{
-    struct lw_terminal_vt100 *vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
+static void SGR(struct lw_terminal *term_emul) {
+    struct lw_terminal_vt100 *vt100 =
+        (struct lw_terminal_vt100 *)term_emul->user_data;
 
     // vim sends "CSI > 4 ; 2 m" and you can't stop it
-    if (term_emul->flag == '>') { return; }
+    if (term_emul->flag == '>') {
+        return;
+    }
 
     if (term_emul->argc == 0) {
         term_emul->argc = 1;
         term_emul->argv[0] = 0;
     }
 
-    for (unsigned int i=0; i<term_emul->argc; i++) {
+    for (unsigned int i = 0; i < term_emul->argc; i++) {
         int p = term_emul->argv[i];
-        switch(p) {
-            case 0:
-                vt100->parsed_attr = LW_DEFAULT_ATTR;
+        switch (p) {
+        case 0:
+            vt100->parsed_attr = LW_DEFAULT_ATTR;
             break;
 
         case 1:
@@ -447,8 +449,7 @@ static void SGR(struct lw_terminal *term_emul)
   The numbering of lines depends on the state of the Origin Mode
   (DECOM).
 */
-static void CUP(struct lw_terminal *term_emul)
-{
+static void CUP(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     int arg0;
     int arg1;
@@ -465,14 +466,17 @@ static void CUP(struct lw_terminal *term_emul)
     if (arg1 < 0)
         arg1 = 0;
 
-    if (MODE_IS_SET(vt100, DECOM))
-    {
+    if (MODE_IS_SET(vt100, DECOM)) {
         arg0 += vt100->margin_top;
         if ((unsigned int)arg0 > vt100->margin_bottom)
             arg0 = vt100->margin_bottom;
     }
-    if (arg0 >= vt100->height) { arg0 = vt100->height - 1; }
-    if (arg1 >= vt100->width) { arg1 = vt100->width - 1; }
+    if (arg0 >= vt100->height) {
+        arg0 = vt100->height - 1;
+    }
+    if (arg1 >= vt100->width) {
+        arg1 = vt100->width - 1;
+    }
     vt100->y = arg0;
     vt100->x = arg1;
 }
@@ -488,30 +492,25 @@ static void CUP(struct lw_terminal *term_emul)
   it is reset by a reset mode (RM) control sequence.
 
 */
-static void SM(struct lw_terminal *term_emul)
-{
+static void SM(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     unsigned int mode;
     unsigned int saved_argc;
 
     vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
-    if (term_emul->argc > 0)
-    {
+    if (term_emul->argc > 0) {
         mode = term_emul->argv[0];
         SET_MODE(vt100, mode);
-        if (mode == DECANM)
-        {
+        if (mode == DECANM) {
             /* TODO: Support vt52 mode */
-            return ;
+            return;
         }
-        if (mode == DECCOLM)
-        {
+        if (mode == DECCOLM) {
             vt100->width = 132;
             vt100->x = vt100->y = 0;
             blank_screen(vt100);
         }
-        if (mode == DECOM)
-        {
+        if (mode == DECOM) {
             saved_argc = term_emul->argc;
             term_emul->argc = 0;
             CUP(term_emul);
@@ -534,8 +533,7 @@ static void SM(struct lw_terminal *term_emul)
   cursor is placed in the home position (see Origin Mode DECOM).
 
 */
-static void DECSTBM(struct lw_terminal *term_emul)
-{
+static void DECSTBM(struct lw_terminal *term_emul) {
     unsigned int margin_top;
     unsigned int margin_bottom;
     struct lw_terminal_vt100 *vt100;
@@ -543,17 +541,14 @@ static void DECSTBM(struct lw_terminal *term_emul)
 
     vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
 
-    if (term_emul->argc == 2)
-    {
+    if (term_emul->argc == 2) {
         margin_top = term_emul->argv[0] - 1;
         margin_bottom = term_emul->argv[1] - 1;
         if (margin_bottom >= vt100->height)
-            return ;
+            return;
         if (margin_bottom - margin_top <= 0)
-            return ;
-    }
-    else
-    {
+            return;
+    } else {
         margin_top = 0;
         margin_bottom = vt100->height - 1;
     }
@@ -594,16 +589,14 @@ static void DECSTBM(struct lw_terminal *term_emul)
   GPO, STP and AVO            ESC [?1;7c
 
 */
-static void DA(struct lw_terminal *term_emul)
-{
+static void DA(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
 
     vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
     vt100->master_write(vt100->user_data, "\033[?1;0c", 7);
 }
 
-static void DSR(struct lw_terminal *term_emul)
-{
+static void DSR(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
 
@@ -611,20 +604,18 @@ static void DSR(struct lw_terminal *term_emul)
         return;
     }
 
-    switch(term_emul->argv[0]) {
-        case 5:
-            vt100->master_write(vt100->user_data, "\033[0n", 4);
-            break;
-        
-        case 6:
-            {
-                char buf[16];
-                snprintf(buf, sizeof(buf), "\033[%d;%dR", vt100->y + 1, vt100->x + 1);
-                vt100->master_write(vt100->user_data, buf, strlen(buf));
-            }
+    switch (term_emul->argv[0]) {
+    case 5:
+        vt100->master_write(vt100->user_data, "\033[0n", 4);
+        break;
 
-        default:
-            ;
+    case 6: {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "\033[%d;%dR", vt100->y + 1, vt100->x + 1);
+        vt100->master_write(vt100->user_data, buf, strlen(buf));
+    }
+
+    default:;
     }
 }
 
@@ -636,8 +627,7 @@ static void DSR(struct lw_terminal *term_emul)
   This sequence causes the previously saved cursor position, graphic
   rendition, and character set to be restored.
 */
-static void DECRC(struct lw_terminal *term_emul)
-{
+static void DECRC(struct lw_terminal *term_emul) {
     /*TODO Save graphic rendition and charset */
     struct lw_terminal_vt100 *vt100;
 
@@ -655,8 +645,7 @@ static void DECRC(struct lw_terminal *term_emul)
   focus and alignment. This command is used by DEC manufacturing and
   Field Service personnel.
 */
-static void DECALN(struct lw_terminal *term_emul)
-{
+static void DECALN(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     unsigned int x;
     unsigned int y;
@@ -676,22 +665,18 @@ static void DECALN(struct lw_terminal *term_emul)
   without changing the column position. If the active position is at the
   bottom margin, a scroll up is performed. Format Effector
 */
-static void IND(struct lw_terminal *term_emul)
-{
+static void IND(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     unsigned int x;
 
     vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
-    if (vt100->y >= vt100->margin_bottom)
-    {
+    if (vt100->y >= vt100->margin_bottom) {
         /* SCROLL */
         vt100->top_line = (vt100->top_line + 1) % (vt100->height * SCROLLBACK);
         for (x = 0; x < vt100->width; ++x)
             set(vt100, x, vt100->margin_bottom, ' ');
 
-    }
-    else
-    {
+    } else {
         /* Do not scroll, just move downward on the current display space */
         vt100->y += 1;
     }
@@ -705,18 +690,14 @@ static void IND(struct lw_terminal *term_emul)
   preceding line. If the active position is at the top margin, a scroll
   down is performed. Format Effector
 */
-static void RI(struct lw_terminal *term_emul)
-{
+static void RI(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
 
     vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
-    if (vt100->y == 0)
-    {
+    if (vt100->y == 0) {
         /* SCROLL */
         vt100->top_line = (vt100->top_line - 1) % (vt100->height * SCROLLBACK);
-    }
-    else
-    {
+    } else {
         /* Do not scroll, just move upward on the current display space */
         vt100->y -= 1;
     }
@@ -731,21 +712,17 @@ static void RI(struct lw_terminal *term_emul)
   on the next line downward. If the active position is at the bottom
   margin, a scroll up is performed. Format Effector
 */
-static void NEL(struct lw_terminal *term_emul)
-{
+static void NEL(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     unsigned int x;
 
     vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
-    if (vt100->y >= vt100->margin_bottom)
-    {
+    if (vt100->y >= vt100->margin_bottom) {
         /* SCROLL */
         vt100->top_line = (vt100->top_line + 1) % (vt100->height * SCROLLBACK);
         for (x = 0; x < vt100->width; ++x)
             set(vt100, x, vt100->margin_bottom, ' ');
-    }
-    else
-    {
+    } else {
         /* Do not scroll, just move downward on the current display space */
         vt100->y += 1;
     }
@@ -764,8 +741,7 @@ static void NEL(struct lw_terminal *term_emul)
   upward. If an attempt is made to move the cursor above the top margin,
   the cursor stops at the top margin. Editor Function
 */
-static void CUU(struct lw_terminal *term_emul)
-{
+static void CUU(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     unsigned int arg0;
 
@@ -794,8 +770,7 @@ static void CUU(struct lw_terminal *term_emul)
   cursor below the bottom margin, the cursor stops at the bottom
   margin. Editor Function
 */
-static void CUD(struct lw_terminal *term_emul)
-{
+static void CUD(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     unsigned int arg0;
 
@@ -822,8 +797,7 @@ static void CUD(struct lw_terminal *term_emul)
   is made to move the cursor to the right of the right margin, the
   cursor stops at the right margin. Editor Function
 */
-static void CUF(struct lw_terminal *term_emul)
-{
+static void CUF(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     unsigned int arg0;
 
@@ -850,8 +824,7 @@ static void CUF(struct lw_terminal *term_emul)
   left. If an attempt is made to move the cursor to the left of the left
   margin, the cursor stops at the left margin. Editor Function
 */
-static void CUB(struct lw_terminal *term_emul)
-{
+static void CUB(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     unsigned int arg0;
 
@@ -873,8 +846,7 @@ static void CUB(struct lw_terminal *term_emul)
   ESC [ Ps P        default value: 1
 
 */
-static void DCH(struct lw_terminal *term_emul)
-{
+static void DCH(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     unsigned int arg0;
     unsigned int x;
@@ -913,8 +885,7 @@ static void DCH(struct lw_terminal *term_emul)
   2         Erase all of the display – all lines are erased, changed to
   single-width, and the cursor does not move.
 */
-static void ED(struct lw_terminal *term_emul)
-{
+static void ED(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     unsigned int arg0;
     unsigned int x;
@@ -924,25 +895,20 @@ static void ED(struct lw_terminal *term_emul)
     arg0 = 0;
     if (term_emul->argc > 0)
         arg0 = term_emul->argv[0];
-    if (arg0 == 0)
-    {
+    if (arg0 == 0) {
         for (x = vt100->x; x < vt100->width; ++x)
             set(vt100, x, vt100->y, ' ');
-        for (x = 0 ; x < vt100->width; ++x)
+        for (x = 0; x < vt100->width; ++x)
             for (y = vt100->y + 1; y < vt100->height; ++y)
                 set(vt100, x, y, ' ');
-    }
-    else if (arg0 == 1)
-    {
-        for (x = 0 ; x < vt100->width; ++x)
+    } else if (arg0 == 1) {
+        for (x = 0; x < vt100->width; ++x)
             for (y = 0; y < vt100->y; ++y)
                 set(vt100, x, y, ' ');
         for (x = 0; x <= vt100->x; ++x)
             set(vt100, x, vt100->y, ' ');
-    }
-    else if (arg0 == 2)
-    {
-        for (x = 0 ; x < vt100->width; ++x)
+    } else if (arg0 == 2) {
+        for (x = 0; x < vt100->width; ++x)
             for (y = 0; y < vt100->height; ++y)
                 set(vt100, x, y, ' ');
     }
@@ -962,8 +928,7 @@ static void ED(struct lw_terminal *term_emul)
   1         Erase from the start of the screen to the active position, inclusive
   2         Erase all of the line, inclusive
 */
-static void EL(struct lw_terminal *term_emul)
-{
+static void EL(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     unsigned int arg0;
     unsigned int x;
@@ -972,18 +937,13 @@ static void EL(struct lw_terminal *term_emul)
     arg0 = 0;
     if (term_emul->argc > 0)
         arg0 = term_emul->argv[0];
-    if (arg0 == 0)
-    {
+    if (arg0 == 0) {
         for (x = vt100->x; x < vt100->width; ++x)
             set(vt100, x, vt100->y, ' ');
-    }
-    else if (arg0 == 1)
-    {
+    } else if (arg0 == 1) {
         for (x = 0; x <= vt100->x; ++x)
             set(vt100, x, vt100->y, ' ');
-    }
-    else if (arg0 == 2)
-    {
+    } else if (arg0 == 2) {
         for (x = 0; x < vt100->width; ++x)
             set(vt100, x, vt100->y, ' ');
     }
@@ -1005,30 +965,22 @@ static void EL(struct lw_terminal *term_emul)
   columns depends on the reset or set state of the origin mode
   (DECOM). Format Effector
 */
-static void HVP(struct lw_terminal *term_emul)
-{
-    CUP(term_emul);
-}
+static void HVP(struct lw_terminal *term_emul) { CUP(term_emul); }
 
-static void TBC(struct lw_terminal *term_emul)
-{
+static void TBC(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
     unsigned int i;
 
     vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
-    if (term_emul->argc == 0 || term_emul->argv[0] == 0)
-    {
+    if (term_emul->argc == 0 || term_emul->argv[0] == 0) {
         vt100->tabulations[vt100->x] = '-';
-    }
-    else if (term_emul->argc == 1 && term_emul->argv[0] == 3)
-    {
+    } else if (term_emul->argc == 1 && term_emul->argv[0] == 3) {
         for (i = 0; i < 132; ++i)
             vt100->tabulations[i] = '-';
     }
 }
 
-static void HTS(struct lw_terminal *term_emul)
-{
+static void HTS(struct lw_terminal *term_emul) {
     struct lw_terminal_vt100 *vt100;
 
     vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
@@ -1040,50 +992,43 @@ static void vt100_write_unicode(struct lw_terminal *term_emul, int c) {
 
     vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
 
-    if (c == '\r')
-    {
+    if (c == '\r') {
         vt100->x = 0;
-        return ;
+        return;
     }
-    if (c == '\n' || c == '\013' || c == '\014')
-    {
+    if (c == '\n' || c == '\013' || c == '\014') {
         if (MODE_IS_SET(vt100, LNM))
             NEL(term_emul);
         else
             IND(term_emul);
-        return ;
+        return;
     }
-    if (c == '\010' && vt100->x > 0)
-    {
+    if (c == '\010' && vt100->x > 0) {
         if (vt100->x == vt100->width)
             vt100->x -= 1;
         vt100->x -= 1;
-        return ;
+        return;
     }
-    if (c == '\t')
-    {
-        do
-        {
+    if (c == '\t') {
+        do {
             set(vt100, vt100->x, vt100->y, ' ');
             vt100->x += 1;
-        } while (vt100->x < vt100->width && vt100->tabulations[vt100->x] == '-');
-        return ;
+        } while (vt100->x < vt100->width &&
+                 vt100->tabulations[vt100->x] == '-');
+        return;
     }
-    if (c == '\016')
-    {
+    if (c == '\016') {
         vt100->selected_charset = 0;
-        return ;
+        return;
     }
-    if (c == '\017')
-    {
+    if (c == '\017') {
         vt100->selected_charset = 1;
-        return ;
+        return;
     }
     if (c < ' ') {
         return;
     }
-    if (vt100->x == vt100->width)
-    {
+    if (vt100->x == vt100->width) {
         if (MODE_IS_SET(vt100, DECAWM))
             NEL(term_emul);
         else
@@ -1111,13 +1056,13 @@ static void vt100_write(struct lw_terminal *term_emul, char c) {
         if (vt100->ustate == 0) {
             if (uc < 0x80) {
                 vt100_write_unicode(term_emul, uc);
-            } else if((uc & 0xe0) == 0xc0) {
+            } else if ((uc & 0xe0) == 0xc0) {
                 vt100->ustate = 1;
                 vt100->ubits = (uc & 0x1f);
-            } else if((uc & 0xf0) == 0xe0) {
+            } else if ((uc & 0xf0) == 0xe0) {
                 vt100->ustate = 2;
                 vt100->ubits = (uc & 0xf);
-            } else if((uc & 0xf8) == 0xf0) {
+            } else if ((uc & 0xf8) == 0xf0) {
                 vt100->ustate = 3;
                 vt100->ubits = (uc & 0x7);
             } else {
@@ -1135,12 +1080,12 @@ static void vt100_write(struct lw_terminal *term_emul, char c) {
                 vt100->ubits <<= 6;
                 vt100->ubits |= uc & 0x3f;
                 if (--vt100->ustate == 0) {
-                vt100_write_unicode(term_emul, vt100->ubits);
+                    vt100_write_unicode(term_emul, vt100->ubits);
                 }
             }
         }
     } else {
-                vt100_write_unicode(term_emul, uc);
+        vt100_write_unicode(term_emul, uc);
     }
 }
 
@@ -1149,15 +1094,16 @@ static void vt100_write(struct lw_terminal *term_emul, char c) {
 #else
 #define __not_in_flash_func(x) x
 #endif
-const lw_cell_t *__not_in_flash_func(lw_terminal_vt100_getline)(struct lw_terminal_vt100 *vt100, unsigned int y) {
+const lw_cell_t *
+__not_in_flash_func(lw_terminal_vt100_getline)(struct lw_terminal_vt100 *vt100,
+                                               unsigned int y) {
     if (y < vt100->margin_top || y > vt100->margin_bottom)
         return vt100->afrozen_screen + FROZEN_SCREEN_PTR(vt100, 0, y);
     else
         return vt100->ascreen + SCREEN_PTR(vt100, 0, y);
 }
 
-const lw_cell_t **lw_terminal_vt100_getlines(struct lw_terminal_vt100 *vt100)
-{
+const lw_cell_t **lw_terminal_vt100_getlines(struct lw_terminal_vt100 *vt100) {
     unsigned int y;
 
     for (y = 0; y < vt100->height; ++y)
@@ -1166,15 +1112,17 @@ const lw_cell_t **lw_terminal_vt100_getlines(struct lw_terminal_vt100 *vt100)
 }
 
 static void setcells(lw_cell_t *buf, lw_cell_t c, size_t n) {
-    for(;n--;buf++) *buf = c;
+    for (; n--; buf++)
+        *buf = c;
 }
 
-struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
-                                     void (*unimplemented)(struct lw_terminal* term_emul, char *seq, char chr),
-                                     void (*master_write)(void *user_data, void *buffer, size_t len),
-                                     lw_cell_t (*encode_attr)(void *user_data, const struct lw_parsed_attr *attr),
-                                     unsigned int width, unsigned int height)
-{
+struct lw_terminal_vt100 *lw_terminal_vt100_init(
+    void *user_data,
+    void (*unimplemented)(struct lw_terminal *term_emul, char *seq, char chr),
+    void (*master_write)(void *user_data, void *buffer, size_t len),
+    lw_cell_t (*encode_attr)(void *user_data,
+                             const struct lw_parsed_attr *attr),
+    unsigned int width, unsigned int height) {
     struct lw_terminal_vt100 *this;
 
     this = calloc(1, sizeof(*this));
@@ -1192,7 +1140,7 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
     this->tabulations = malloc(132);
     if (this->tabulations == NULL)
         goto free_frozen_screen;
-    for(int i=0; i<132; i++) {
+    for (int i = 0; i < 132; i++) {
         this->tabulations[i] = (i && i % 8 == 0) ? '|' : '-';
     }
     this->margin_top = 0;
@@ -1234,7 +1182,8 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
     this->master_write = master_write;
     this->encode_attr = encode_attr ? encode_attr : default_encode_attr;
     this->map_unicode = default_map_unicode;
-    lw_terminal_vt100_read_str(this, "\033[m\033[?7h"); // set default attributes
+    lw_terminal_vt100_read_str(this,
+                               "\033[m\033[?7h"); // set default attributes
     setcells(this->ascreen, ' ' | this->attr, 132 * SCROLLBACK * this->height);
     setcells(this->afrozen_screen, ' ' | this->attr, 132 * this->height);
     return this;
@@ -1253,7 +1202,7 @@ free_this:
 static void show_cursor(struct lw_terminal_vt100 *this) {
     unsigned x = this->x, y = this->y;
     lw_cell_t cell;
-    if(x == this->width)
+    if (x == this->width)
         x -= 1;
     if (x >= this->width || y >= this->height) {
         this->cursor_saved_flag = false;
@@ -1268,26 +1217,27 @@ static void show_cursor(struct lw_terminal_vt100 *this) {
 }
 
 static void hide_cursor(struct lw_terminal_vt100 *this) {
-    if (!this->cursor_saved_flag) { return; }
+    if (!this->cursor_saved_flag) {
+        return;
+    }
     this->cursor_saved_flag = false;
     unsigned x = this->cursor_saved_x, y = this->cursor_saved_y;
     aset(this, x, y, aget(this, x, y) ^ CURSOR_ATTR);
 }
 
-void lw_terminal_vt100_read_str(struct lw_terminal_vt100 *this, const char *buffer)
-{
+void lw_terminal_vt100_read_str(struct lw_terminal_vt100 *this,
+                                const char *buffer) {
     lw_terminal_vt100_read_buf(this, buffer, strlen(buffer));
 }
 
-void lw_terminal_vt100_read_buf(struct lw_terminal_vt100 *this, const char *buffer, size_t len)
-{
+void lw_terminal_vt100_read_buf(struct lw_terminal_vt100 *this,
+                                const char *buffer, size_t len) {
     hide_cursor(this);
     lw_terminal_parser_read_buf(this->lw_terminal, buffer, len);
     show_cursor(this);
 }
 
-void lw_terminal_vt100_destroy(struct lw_terminal_vt100 *this)
-{
+void lw_terminal_vt100_destroy(struct lw_terminal_vt100 *this) {
     lw_terminal_parser_destroy(this->lw_terminal);
     free(this->tabulations);
     free(this->ascreen);

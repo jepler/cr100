@@ -11,9 +11,9 @@ def dump(vt100):
 def main():
     vt100 = hl_vt100.vt100_headless()
     vt100.changed_callback = lambda: dump(vt100)
-    vt100.fork('top', ['top'])
+    vt100.fork("top", ["top"])
     vt100.main_loop()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -1,11 +1,11 @@
-#include "atkbd.pio.h"
 #include "keyboard.h"
-#include "pinout.h"
+#include "atkbd.pio.h"
 #include "chargen.h"
+#include "pinout.h"
 
+#include "hardware/clocks.h"
 #include "pico.h"
 #include "pico/stdlib.h"
-#include "hardware/clocks.h"
 
 #define EOF (-1)
 
@@ -18,14 +18,18 @@ static int kbd_sm;
 static int ll_kbd_read_timeout(int timeout_us) {
     uint64_t deadline = time_us_64() + timeout_us;
     while (pio_sm_is_rx_fifo_empty(kbd_pio, kbd_sm)) {
-        if(time_us_64() > deadline) { return EOF; }
+        if (time_us_64() > deadline) {
+            return EOF;
+        }
     }
     return pio_sm_get_blocking(kbd_pio, kbd_sm);
 }
 
 static int kbd_read_timeout(int timeout_us) {
     int r = ll_kbd_read_timeout(timeout_us);
-    if (r == EOF) { return EOF; }
+    if (r == EOF) {
+        return EOF;
+    }
     r = (r >> 22) & 0xff;
     return r; // todo: check parity, start & end bits!
 }
@@ -54,7 +58,6 @@ static bool write_expect_fa(int value, const char *msg) {
     pio_sm_clear_fifos(kbd_pio, kbd_sm);
     kbd_write_blocking(value);
     return expect(0xfa, msg);
-
 }
 bool keyboard_setup(PIO pio) {
     gpio_init(KEYBOARD_DATA_PIN);
@@ -64,14 +67,14 @@ bool keyboard_setup(PIO pio) {
     gpio_pull_down(KEYBOARD_DATA_PIN + 1);
 
     int i = 0, j = 1;
-    while(!(gpio_get(KEYBOARD_DATA_PIN) && gpio_get(KEYBOARD_DATA_PIN + 1))) {
-        if(i ++ == j) {
+    while (!(gpio_get(KEYBOARD_DATA_PIN) && gpio_get(KEYBOARD_DATA_PIN + 1))) {
+        if (i++ == j) {
             scrnprintf("Waiting for keyboard to boot... %d ms so far\r", i);
             j *= 10;
         }
         sleep_ms(1);
     }
-    
+
     sleep_ms(10);
 
     kbd_pio = pio;
@@ -99,17 +102,20 @@ bool keyboard_setup(PIO pio) {
     return ok;
 }
 
-
-enum { LSHIFT=1, LCTRL=2, LALT=4, RSHIFT = 8, RCTRL = 16, RALT = 32, MOD_CAPS=64, MOD_NUM = 128, TOGGLING_MODIFIERS = MOD_CAPS | MOD_NUM };
+enum {
+    LSHIFT = 1,
+    LCTRL = 2,
+    LALT = 4,
+    RSHIFT = 8,
+    RCTRL = 16,
+    RALT = 32,
+    MOD_CAPS = 64,
+    MOD_NUM = 128,
+    TOGGLING_MODIFIERS = MOD_CAPS | MOD_NUM
+};
 const char keyboard_modifiers[256] = {
-    [0x12] = LSHIFT,
-    [0x59] = RSHIFT,
-    [0x11] = LCTRL,
-    [0x58] = RCTRL,
-    [0x19] = LALT,
-    [0x39] = RALT,
-    [0x14] = MOD_CAPS,
-    [0x76] = MOD_NUM,
+    [0x12] = LSHIFT, [0x59] = RSHIFT, [0x11] = LCTRL,    [0x58] = RCTRL,
+    [0x19] = LALT,   [0x39] = RALT,   [0x14] = MOD_CAPS, [0x76] = MOD_NUM,
 };
 
 enum SYMBOLS {
@@ -143,37 +149,21 @@ enum SYMBOLS {
 
 const char *const symtab[MAX_SYMBOLS] = {
 #define ENT(x, y) [x] = y
-    ENT(F1, "\eOP"),
-    ENT(F2, "\eOQ"),
-    ENT(F3, "\eOR"),
-    ENT(F4, "\eOS"),
-    ENT(F5, "\e[15~"),
-    ENT(F6, "\e[17~"),
-    ENT(F7, "\e[18~"),
-    ENT(F8, "\e[19~"),
-    ENT(F9, "\e[20~"),
-    ENT(F10, "\e[21~"),
-    ENT(F11, "\e[23~"),
-    ENT(F12, "\e[24~"),
-    ENT(PRTSCR, "\ei"),
-    ENT(PAUSE, ""),
-    ENT(INSERT, "\e[2~"),
-    ENT(DELETE, "\e[3~"),
-    ENT(UPARROW, "\e[A"),
-    ENT(DOWNARROW, "\e[B"),
-    ENT(RIGHTARROW, "\e[C"),
-    ENT(LEFTARROW, "\e[D"),
-    ENT(HOME, "\e[H"),
-    ENT(END, "\e[F"),
-    ENT(PAGEUP, "\e[5~"),
-    ENT(PAGEDOWN, "\e[6~"),
+    ENT(F1, "\eOP"),         ENT(F2, "\eOQ"),        ENT(F3, "\eOR"),
+    ENT(F4, "\eOS"),         ENT(F5, "\e[15~"),      ENT(F6, "\e[17~"),
+    ENT(F7, "\e[18~"),       ENT(F8, "\e[19~"),      ENT(F9, "\e[20~"),
+    ENT(F10, "\e[21~"),      ENT(F11, "\e[23~"),     ENT(F12, "\e[24~"),
+    ENT(PRTSCR, "\ei"),      ENT(PAUSE, ""),         ENT(INSERT, "\e[2~"),
+    ENT(DELETE, "\e[3~"),    ENT(UPARROW, "\e[A"),   ENT(DOWNARROW, "\e[B"),
+    ENT(RIGHTARROW, "\e[C"), ENT(LEFTARROW, "\e[D"), ENT(HOME, "\e[H"),
+    ENT(END, "\e[F"),        ENT(PAGEUP, "\e[5~"),   ENT(PAGEDOWN, "\e[6~"),
 #undef ENT
 };
 
 #define SYM(x) (0x8000 | (int)(x))
 #define CMD(x) (0xc000 | (int)(x))
-#define CHAR2(c, d) (int) c | (((int) d) << 8)
-#define CHAR2(c, d) (int) c | (((int) d) << 8)
+#define CHAR2(c, d) (int)c | (((int)d) << 8)
+#define CHAR2(c, d) (int)c | (((int)d) << 8)
 #define ALPHA(c) CHAR2(c, c ^ ('a' ^ 'A'))
 #define NOMOD(c) CHAR2(c, c)
 
@@ -199,7 +189,7 @@ const uint16_t keyboard_codes[256] = {
     [0x62] = SYM(PAUSE),
     [0x67] = SYM(INSERT),
     [0x64] = SYM(DELETE),
-    
+
     [0x0e] = CHAR2('`', '~'),
     [0x16] = CHAR2('1', '!'),
     [0x1e] = CHAR2('2', '@'),
@@ -260,7 +250,6 @@ const uint16_t keyboard_codes[256] = {
     [0x6a] = SYM(RIGHTARROW),
     [0x60] = SYM(DOWNARROW),
 
-
     [0x6e] = SYM(HOME),
     [0x65] = SYM(END),
     [0x6f] = SYM(PAGEUP),
@@ -275,20 +264,19 @@ static void queue_add_data(queue_t *q, int data) {
 }
 
 static void queue_add_str(queue_t *q, const char *s) {
-    while(*s) queue_add_data(q, *s++);
+    while (*s)
+        queue_add_data(q, *s++);
 }
 
-
-static
-void queue_handle_event(queue_t *q, bool release, int value) {
+static void queue_handle_event(queue_t *q, bool release, int value) {
     int modifiers = keyboard_modifiers[value];
     if (modifiers) {
-        if(release) {
+        if (release) {
             if (modifiers & TOGGLING_MODIFIERS) {
                 current_modifiers ^= modifiers;
                 keyboard_set_leds(
-                        ((current_modifiers & MOD_NUM) ? LED_NUM : 0) |
-                        ((current_modifiers & MOD_CAPS) ? LED_CAPS : 0));
+                    ((current_modifiers & MOD_NUM) ? LED_NUM : 0) |
+                    ((current_modifiers & MOD_CAPS) ? LED_CAPS : 0));
             } else {
                 current_modifiers &= ~modifiers;
             }
@@ -301,7 +289,9 @@ void queue_handle_event(queue_t *q, bool release, int value) {
         }
         return;
     }
-    if(release) { return; }
+    if (release) {
+        return;
+    }
 
     bool is_shift = current_modifiers & (LSHIFT | RSHIFT);
     bool is_ctrl = current_modifiers & (LCTRL | RCTRL);
@@ -309,19 +299,19 @@ void queue_handle_event(queue_t *q, bool release, int value) {
     bool is_caps = current_modifiers & (MOD_CAPS);
 
     int kc = keyboard_codes[value];
-    if(!kc) {
-        scrnprintf("\r\nUn-mapped key: 0x%02x\r\n", value); 
+    if (!kc) {
+        scrnprintf("\r\nUn-mapped key: 0x%02x\r\n", value);
         return;
     }
 
-    if((kc & 0xc000) == 0xc000) {
+    if ((kc & 0xc000) == 0xc000) {
         queue_add_data(q, kc);
         return;
     }
 
-    if(kc & 0x8000) {
+    if (kc & 0x8000) {
         int sym = kc & 0x7fff;
-        if(is_ctrl && is_alt) {
+        if (is_ctrl && is_alt) {
             if (sym == DELETE) {
                 queue_add_data(q, CMD_REBOOT);
             }
@@ -342,19 +332,20 @@ void queue_handle_event(queue_t *q, bool release, int value) {
 
     int c = LO(kc);
     // scrnprintf("c=%d HI=%d is_shift=%d\n", c, HI(kc), is_shift);
-    if(HI(kc) && is_shift) c = HI(kc);
+    if (HI(kc) && is_shift)
+        c = HI(kc);
 #define CTRLABLE(c) (c >= 64 && c <= 127)
-    if(is_ctrl && CTRLABLE(c)) {
+    if (is_ctrl && CTRLABLE(c)) {
         c = c & 0x1f;
     }
-    if(is_ctrl && c == 010) {
+    if (is_ctrl && c == 010) {
         c = 0377; // ctrl-backspace = RUBOUT
     }
 #define IS_ALPHA(c) ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
-    if(is_caps && IS_ALPHA(c)) {
+    if (is_caps && IS_ALPHA(c)) {
         c ^= ('a' ^ 'A');
     }
-    if(is_alt) {
+    if (is_alt) {
         queue_add_data(q, '\033');
     }
     queue_add_data(q, c);
@@ -364,9 +355,8 @@ void keyboard_poll(queue_t *q) {
     int value = kbd_read_timeout(0);
     if (value == EOF) {
         return;
-    }
-    else if (value == 0xfa) {
-        if(pending_led_flag) {
+    } else if (value == 0xfa) {
+        if (pending_led_flag) {
             kbd_write_blocking(pending_led_value);
             pending_led_flag = false;
         }

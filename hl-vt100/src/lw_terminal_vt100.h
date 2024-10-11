@@ -26,8 +26,8 @@
 #ifndef __LW_TERMINAL_VT100_H__
 #define __LW_TERMINAL_VT100_H__
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "lw_terminal_parser.h"
 
@@ -39,28 +39,27 @@
 
 #define SCROLLBACK 3
 
-#define MASK_LNM     1
-#define MASK_DECCKM  2
-#define MASK_DECANM  4
+#define MASK_LNM 1
+#define MASK_DECCKM 2
+#define MASK_DECANM 4
 #define MASK_DECCOLM 8
 #define MASK_DECSCLM 16
 #define MASK_DECSCNM 32
-#define MASK_DECOM   64
-#define MASK_DECAWM  128
-#define MASK_DECARM  256
+#define MASK_DECOM 64
+#define MASK_DECAWM 128
+#define MASK_DECARM 256
 #define MASK_DECINLM 512
 
-#define LNM     20
-#define DECCKM  1
-#define DECANM  2
+#define LNM 20
+#define DECCKM 1
+#define DECANM 2
 #define DECCOLM 3
 #define DECSCLM 4
 #define DECSCNM 5
-#define DECOM   6
-#define DECAWM  7
-#define DECARM  8
+#define DECOM 6
+#define DECAWM 7
+#define DECARM 8
 #define DECINLM 9
-
 
 #define SET_MODE(vt100, mode) ((vt100)->modes |= get_mode_mask(mode))
 #define UNSET_MODE(vt100, mode) ((vt100)->modes &= ~get_mode_mask(mode))
@@ -73,7 +72,7 @@ struct lw_parsed_attr {
     bool blink, bold, inverse;
 };
 
-#define LW_DEFAULT_ATTR ((struct lw_parsed_attr) { 7, 0, false, false, false })
+#define LW_DEFAULT_ATTR ((struct lw_parsed_attr){7, 0, false, false, false})
 
 /*
 ** frozen_screen is the frozen part of the screen
@@ -81,8 +80,7 @@ struct lw_parsed_attr {
 ** The top of the frozen_screen holds the top margin
 ** while the bottom holds the bottom margin.
 */
-struct lw_terminal_vt100
-{
+struct lw_terminal_vt100 {
     struct lw_terminal *lw_terminal;
     int ustate, ubits;
     unsigned int width;
@@ -94,36 +92,42 @@ struct lw_terminal_vt100
     unsigned int margin_top;
     unsigned int margin_bottom;
     unsigned int top_line; /* Line at the top of the display */
-    lw_cell_t    *ascreen;
-    lw_cell_t    *afrozen_screen;
-    char         *tabulations;
-    bool         unicode;
+    lw_cell_t *ascreen;
+    lw_cell_t *afrozen_screen;
+    char *tabulations;
+    bool unicode;
     bool cursor_saved_flag;
     unsigned int selected_charset;
     unsigned int modes;
     struct lw_parsed_attr parsed_attr;
-    lw_cell_t    attr;
+    lw_cell_t attr;
     int cursor_saved_x, cursor_saved_y;
-    const lw_cell_t    *alines[80];
-    void         (*master_write)(void *user_data, void *buffer, size_t len);
-    lw_cell_t    (*encode_attr)(void *user_data, const struct lw_parsed_attr *attr);
-    int          (*map_unicode)(void *user_data, int c);
-    void         *user_data;
+    const lw_cell_t *alines[80];
+    void (*master_write)(void *user_data, void *buffer, size_t len);
+    lw_cell_t (*encode_attr)(void *user_data,
+                             const struct lw_parsed_attr *attr);
+    int (*map_unicode)(void *user_data, int c);
+    void *user_data;
 };
 
-struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
-                                     void (*unimplemented)(struct lw_terminal* term_emul,
-                                                           char *seq, char chr),
-                                     void (*master_write)(void *user_data, void *buffer, size_t len),
-                                     lw_cell_t (*encode_attr)(void *user_data,
-                                                         const struct lw_parsed_attr *attr),
-                                     unsigned int width, unsigned int height);
-char lw_terminal_vt100_get(struct lw_terminal_vt100 *vt100, unsigned int x, unsigned int y);
-lw_cell_t lw_terminal_vt100_aget(struct lw_terminal_vt100 *vt100, unsigned int x, unsigned int y);
-const lw_cell_t *lw_terminal_vt100_getline(struct lw_terminal_vt100 *vt100, unsigned y);
+struct lw_terminal_vt100 *lw_terminal_vt100_init(
+    void *user_data,
+    void (*unimplemented)(struct lw_terminal *term_emul, char *seq, char chr),
+    void (*master_write)(void *user_data, void *buffer, size_t len),
+    lw_cell_t (*encode_attr)(void *user_data,
+                             const struct lw_parsed_attr *attr),
+    unsigned int width, unsigned int height);
+char lw_terminal_vt100_get(struct lw_terminal_vt100 *vt100, unsigned int x,
+                           unsigned int y);
+lw_cell_t lw_terminal_vt100_aget(struct lw_terminal_vt100 *vt100,
+                                 unsigned int x, unsigned int y);
+const lw_cell_t *lw_terminal_vt100_getline(struct lw_terminal_vt100 *vt100,
+                                           unsigned y);
 const lw_cell_t **lw_terminal_vt100_getlines(struct lw_terminal_vt100 *vt100);
 void lw_terminal_vt100_destroy(struct lw_terminal_vt100 *this);
-void lw_terminal_vt100_read_str(struct lw_terminal_vt100 *this, const char *buffer);
-void lw_terminal_vt100_read_buf(struct lw_terminal_vt100 *this, const char *buffer, size_t n);
+void lw_terminal_vt100_read_str(struct lw_terminal_vt100 *this,
+                                const char *buffer);
+void lw_terminal_vt100_read_buf(struct lw_terminal_vt100 *this,
+                                const char *buffer, size_t n);
 
 #endif

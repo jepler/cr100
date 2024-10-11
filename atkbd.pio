@@ -15,7 +15,7 @@ start:
     ; keyboard has signaled start condition
     set x 9             ; will receive 10 bits (data + parity + stop)
     wait 1 pin 1        ; wait for clock pin to go high (discard start bit)
-    
+
 receive_bit:
     wait 0 pin 1
     in pins 1
@@ -35,7 +35,7 @@ send_bit:
     out pins 1
     wait 1 pin 1
     jmp x-- send_bit
-    
+
     set pindirs 0      ; pins back to input mode
     wait 0 pin 0
     wait 1 pin 0        ; wait for keyboard ACK
@@ -78,4 +78,3 @@ void atkbd_program_init(PIO pio, int sm, int offset, int base_pin) {
 }
 
 %}
-

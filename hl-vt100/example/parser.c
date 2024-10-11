@@ -1,25 +1,21 @@
-#include <stdlib.h>
-#include <stdio.h>
 #include "../src/lw_terminal_parser.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 static void vt100_write(struct lw_terminal *term_emul __attribute__((unused)),
-                        char c)
-{
+                        char c) {
     printf("Got a char : %c\n", c);
 }
 
-static void csi_f(struct lw_terminal *term_emul)
-{
+static void csi_f(struct lw_terminal *term_emul) {
     printf("\\033[...f with %d parameters\n", term_emul->argc);
 }
 
-static void csi_K(struct lw_terminal *term_emul)
-{
+static void csi_K(struct lw_terminal *term_emul) {
     printf("\\033[...K with %d parameters\n", term_emul->argc);
 }
 
-int main(void)
-{
+int main(void) {
     struct lw_terminal *lw_terminal;
 
     lw_terminal = lw_terminal_parser_init();

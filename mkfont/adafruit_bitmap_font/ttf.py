@@ -28,7 +28,7 @@ class TTF:
             s = struct.calcsize(format)
             return struct.unpack_from(format, f.read(s))
 
-        scalar_type = read(">I")
+        read(">I")  # discard "scalar_type
         numTables, searchRange, entrySelector, rangeShift = read(">HHHH")
 
         print(numTables)
