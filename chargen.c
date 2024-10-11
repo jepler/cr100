@@ -202,6 +202,7 @@ static int map_one(int i) {
 static lw_cell_t char_attr(void *user_data, const struct lw_parsed_attr *attr) {
     int fg = map_one(attr->fg);
     int bg = map_one(attr->bg);
+    if (fg == bg && attr->fg != attr->bg) { fg = bg + 1; }
     if(attr->bold) fg = 3;
     if(attr->blink) fg ^= 4;
     if(attr->inverse) {
@@ -258,6 +259,7 @@ uart_data_t uart_data[] = {
 #define N_UARTS (COUNT_OF(uart_data))
 
 static void uart_activate(void *data_in) {
+    vt100->unicode = 0;
     uart_data_t *data = (uart_data_t *)data_in;
     uart_inst_t *inst = uart_get_instance(data->uart);
     uart_init(inst, baudrates[data->baud_idx]);
@@ -311,7 +313,9 @@ static void uart_describe(void *data_in, char *buf, size_t buflen) {
     snprintf(buf, buflen, "UART%d %5d %s", current_port, baudrates[data->baud_idx], config->label);
 }
 
-static void usb_activate(void *data) {}
+static void usb_activate(void *data) {
+    vt100->unicode = 1;
+}
 
 static void usb_deactivate(void *data) {}
 static int usb_getc_nonblocking(void *data) {
@@ -465,6 +469,37 @@ void master_write(void *user_data, void *buffer_in, size_t len) {
     for(;len--;buffer++) { port_putc(*buffer); }
 }
 
+static
+int map_unicode(void *unused, int n) { switch(n) {
+case 9670: return 1;
+case 9618: return 2;
+case 9225: return 3;
+case 9228: return 4;
+case 9229: return 5;
+case 9226: return 6;
+case 9252: return 9;
+case 9227: return 10;
+case 9496: return 11;
+case 9488: return 12;
+case 9484: return 13;
+case 9492: return 14;
+case 9532: return 15;
+case 9146: return 16;
+case 9147: return 17;
+case 9472: return 18;
+case 9148: return 19;
+case 9149: return 20;
+case 9500: return 21;
+case 9508: return 22;
+case 9524: return 23;
+case 9516: return 24;
+case 9474: return 25;
+case 8804: return 26;
+case 8805: return 27;
+case 960: return 28;
+case 8800: return 29;
+}return '?';}
+
 static int old_keyboard_leds;
 int main(void) {
 #if !STANDALONE
@@ -477,9 +512,12 @@ int main(void) {
     }
 
     vt100 = lw_terminal_vt100_init(NULL, NULL, master_write, char_attr, FB_WIDTH_CHAR, FB_HEIGHT_CHAR - 1);
+    vt100->map_unicode = map_unicode;
     multicore_launch_core1(core1_entry);
 
     scrnprintf(" \r");
+
+    port_activate();
 
     if (keyboard_setup(pio1)) {
         queue_init(&keyboard_queue, sizeof(int), 64);

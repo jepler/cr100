@@ -107,6 +107,7 @@ struct lw_terminal_vt100
     const lw_cell_t    *alines[80];
     void         (*master_write)(void *user_data, void *buffer, size_t len);
     lw_cell_t    (*encode_attr)(void *user_data, const struct lw_parsed_attr *attr);
+    int          (*map_unicode)(void *user_data, int c);
     void         *user_data;
 };
 

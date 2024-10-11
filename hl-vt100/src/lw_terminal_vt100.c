@@ -335,6 +335,10 @@ x Pm = 97 / 107      fg/bg Bright White
 x Pm = 99 / 109      fg/bg Bright Default
 */
 
+static int default_map_unicode(void *user_data, int c) {
+    return '?';
+}
+
 static lw_cell_t default_encode_attr(void *user_data, const struct lw_parsed_attr *attr) {
     (void)user_data;
 
@@ -1035,6 +1039,7 @@ static void vt100_write_unicode(struct lw_terminal *term_emul, int c) {
     struct lw_terminal_vt100 *vt100;
 
     vt100 = (struct lw_terminal_vt100 *)term_emul->user_data;
+
     if (c == '\r')
     {
         vt100->x = 0;
@@ -1086,6 +1091,9 @@ static void vt100_write_unicode(struct lw_terminal *term_emul, int c) {
     }
     if (!vt100->selected_charset && c >= 95 && c < 127) {
         c = c - 95;
+    }
+    if (c >= 0x100) {
+        c = vt100->map_unicode(vt100, c);
     }
     set(vt100, vt100->x, vt100->y, c);
     vt100->x += 1;
@@ -1225,6 +1233,7 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
     this->lw_terminal->unimplemented = unimplemented;
     this->master_write = master_write;
     this->encode_attr = encode_attr ? encode_attr : default_encode_attr;
+    this->map_unicode = default_map_unicode;
     lw_terminal_vt100_read_str(this, "\033[m\033[?7h"); // set default attributes
     setcells(this->ascreen, ' ' | this->attr, 132 * SCROLLBACK * this->height);
     setcells(this->afrozen_screen, ' ' | this->attr, 132 * this->height);
