@@ -16,11 +16,8 @@ on LCD displays is not recommended. (that said, it does KINDA work for testing)
  * foreground & background colors for each cell
  * blinking text
  * vt1xx-like terminal, use cr100 terminal entry for best compatibility
- * Doesn't support UTF-8 which sadly a lot of Linux expects now
-   * there's partially implemented UTF-8 support; why not finish it &
-     make it a setting
- * line drawing characters don't work; maybe see the above point about UTF-8?
-   * Using tput smacs DOES work, but I guess modern programs do not work this way
+ * Extremely minimal UTF-8 support, enabled when the port is USB
+   * Supports the "VT100 graphics characters" at their corresponding code points
 
 ## Building
 
@@ -47,7 +44,7 @@ Final pinout plan (RP2040 GPIO numbering):
 
 ## DAC resistors
 
-On the test monitor 440Ω & 660Ω resistances give good luminance levels though the top voltage ends up slightly out of spec at around 750mV.
+On the test monitor 510Ω & 680Ω resistances give good luminance levels and are close to the VGA voltage spec.
 
 ## Inspiration; Software & Hardware I Studied
 
