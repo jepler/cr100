@@ -1,4 +1,5 @@
 cr100,
     cols#132, lines#52,
+    smm@,
     rs2=\E[?3;4;5l\E[?7;8h\E[r,
     use=vt102,
