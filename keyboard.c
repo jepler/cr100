@@ -63,8 +63,12 @@ bool keyboard_setup(PIO pio) {
     gpio_pull_down(KEYBOARD_DATA_PIN);
     gpio_pull_down(KEYBOARD_DATA_PIN + 1);
 
+    int i = 0, j = 1;
     while(!(gpio_get(KEYBOARD_DATA_PIN) && gpio_get(KEYBOARD_DATA_PIN + 1))) {
-        scrnprintf("Waiting for keyboard to boot...\r\n");
+        if(i ++ == j) {
+            scrnprintf("Waiting for keyboard to boot... %d ms so far\r", i);
+            j *= 10;
+        }
         sleep_ms(1);
     }
     
