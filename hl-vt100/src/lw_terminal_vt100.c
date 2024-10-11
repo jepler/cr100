@@ -1225,7 +1225,7 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(void *user_data,
     this->lw_terminal->unimplemented = unimplemented;
     this->master_write = master_write;
     this->encode_attr = encode_attr ? encode_attr : default_encode_attr;
-    lw_terminal_vt100_read_str(this, "\033[m"); // set default attributes
+    lw_terminal_vt100_read_str(this, "\033[m\033[?7h"); // set default attributes
     setcells(this->ascreen, ' ' | this->attr, 132 * SCROLLBACK * this->height);
     setcells(this->afrozen_screen, ' ' | this->attr, 132 * this->height);
     return this;

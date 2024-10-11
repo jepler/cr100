@@ -15,11 +15,12 @@ on LCD displays is not recommended. (that said, it does KINDA work for testing)
  * 4 brightness levels
  * foreground & background colors for each cell
  * blinking text
-
-## TODO
-
- * ANSI-style escape codes
- * UART & PS/2 I/O
+ * vt1xx-like terminal, use cr100 terminal entry for best compatibility
+ * Doesn't support UTF-8 which sadly a lot of Linux expects now
+   * there's partially implemented UTF-8 support; why not finish it &
+     make it a setting
+ * line drawing characters don't work; maybe see the above point about UTF-8?
+   * Using tput smacs DOES work, but I guess modern programs do not work this way
 
 ## Building
 
@@ -105,18 +106,18 @@ Heirloom VGA 640x480@60Hz:
  * 640 visible pixels, 800 total pixels = 31.47kHz horizontal rate
  * 480 visible lines, 525 total lines = 59.92Hz vertical rate
 
-My 660x480@60Hz mode:
+My 660x477@60Hz mode:
  * 26.000MHz dot clock
  * 660 visible pixels, 826 total pixels = 31.48kHz horizontal rate (<1% high)
- * 480 visible lines, 525 total lines = 59.96Hz vertical rate (<1% high)
+ * 477 visible lines, 525 total lines = 59.96Hz vertical rate (<1% high)
 
 I don't expect there to be any problem for an old monitor to sync to this signal.
 
-# Installing the terminal entry
+## Installing the terminal entry
 
 `make install-termcap` or `sudo make install-termcap` (to install systemwide, best if enabling getty).
 
-# Enabling getty on Linux
+## Enabling getty on Linux
 
 Find the serial number of your device and create a udev rule for it (in a file like `/etc/udev/rules.d/97-cr100.rules`) that gives it a consistent name in /dev:
 ```
@@ -135,9 +136,16 @@ Restart udev:
 systemctl restart udev
 ```
 
-Plug in the Pico board. You should get a login prompt on the terminal. If not, well, you get to debug USB & systemd now. These steps worked on my Debian Bookworm system, but literally they work every other time. :-/
+Plug in the Pico board. You should get a login prompt on the terminal. If not, well, you get to debug USB & systemd now. These steps sort of worked on my Debian Bookworm system: but literally they work every other time you start the device. :-/
 
-# License
+## Hot Keys
+
+ * CTRL+ALT+F1: Cycle connections (USB/UART1/UART2)
+ * CTRL+ALT+F2: Cycle baud rates (UART only)
+ * CTRL+ALT+F2: Cycle data format (UART only)
+ * CTRL+ALT+DELETE: Reboot the firmware
+
+## License
 
 All my original code is available under the MIT license.
 
