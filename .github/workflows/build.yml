@@ -1,0 +1,48 @@
+name: Build cr100
+
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
+  check_suite:
+    types: [rerequested]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        filter: "blob:none"
+        fetch-depth: 0
+        submodules: true
+
+    - uses: carlosperate/arm-none-eabi-gcc-action@v1
+      with:
+        # When changing this update what Windows grabs too!
+        release: '13.3.Rel1'
+
+    - run:
+        make -j$(nproc) dist
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: cr100
+        path: dist/
+        if-no-files-found: error
+
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: false
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: pre-commit
+      run: pip install pre-commit && pre-commit run --all

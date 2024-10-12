@@ -3,7 +3,7 @@ all: uf2
 
 .PHONY: clean
 clean:
-	rm -rf build
+	rm -rf build dist
 
 build/Makefile:
 	cmake -S . -B build
@@ -19,7 +19,7 @@ uf2: | build/Makefile
 	$(MAKE) -C build
 
 .PHONY: flash
-flash: build/cr100.uf2
+flash: uf2
 	$(MAKE) -C build
 	_douf2 RPI-RP2 build/cr100.uf2 /dev/serial/by-id/usb-Raspberry_Pi_Pico_*-if00
 
@@ -28,3 +28,11 @@ flash: build/cr100.uf2
 # database.
 install-terminfo:
 	tic -v cr100.terminfo
+
+.PHONY: dist
+dist: uf2
+	rm -rf dist
+	mkdir -p dist/bin dist/terminfo
+	cp build/cr100.uf2 dist/bin/
+	cp build/cr100.elf dist/bin
+	tic -o dist/terminfo cr100.terminfo
