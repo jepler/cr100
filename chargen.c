@@ -281,7 +281,7 @@ typedef struct uart_data {
 } uart_data_t;
 
 uart_data_t uart_data[] = {
-    {0, 0, 1},
+    {0, 0, 1, .baud_idx = 6},
     {0, 12, 13},
 };
 #define N_UARTS (COUNT_OF(uart_data))
