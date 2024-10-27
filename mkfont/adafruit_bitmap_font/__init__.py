@@ -16,9 +16,7 @@ class Bitmap:
 
     def __getitem__(self, index):
         if isinstance(index, tuple):
-            print(index[0], index[1], self.width, len(self))
             index = index[0] + index[1] * self.width
-            print(index)
         return self.values[index]
 
     def __len__(self):

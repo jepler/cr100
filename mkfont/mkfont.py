@@ -1,7 +1,6 @@
 import array
 import sys
 
-import click
 from adafruit_bitmap_font import bitmap_font, Bitmap
 
 
@@ -25,20 +24,15 @@ class OffsetBitmap:
         x = x - self.glyph.dx
         y = y - (7 - self.glyph.height) + self.glyph.dy
 
-        print(pos, x, y)
         if 0 <= x < self.glyph.bitmap.width and 0 <= y < self.glyph.bitmap.height:
             return self.glyph.bitmap[x, y]
         return 0
 
 
-@click.command
-@click.argument("bdf", type=click.Path(exists=True))
-@click.argument("header", type=click.File(mode="w"), default=sys.stdout)
 def main(bdf, header):
     font = bitmap_font.load_font(bdf, Bitmap)
     width, height, dx, dy = font.get_bounding_box()
 
-    print(width, height, dx, dy)
     #    if width != 5 or height != 9:
     #        raise SystemExit("sorry, only 5x9 monospace fonts supported")
 
@@ -50,7 +44,6 @@ def main(bdf, header):
         g = font.get_glyph(i)
         if g is None:
             continue
-        print(repr(chr(i)), g)
         bitmap = OffsetBitmap(dx, dy, g)
         for j in range(9):
             d = extract_deposit_bits(
@@ -61,8 +54,9 @@ def main(bdf, header):
                 (bitmap[0, j], 8, 9),
             )
             output_data[j * 256 + i] = d << 2
-    print(", ".join(f"0x{x:04x}" for x in output_data), file=header)
+    for x in output_data:
+        print(f"0x{x:04x},", file=header)
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1], open(sys.argv[2], "w", encoding="utf-8"))
