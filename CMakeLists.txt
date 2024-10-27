@@ -42,6 +42,18 @@ add_custom_command(
   DEPENDS vgamode.py
   )
 
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/5x9.h
+  COMMAND python3 ${CMAKE_CURRENT_LIST_DIR}/mkfont/mkfont.py
+    ${CMAKE_CURRENT_LIST_DIR}/mkfont/5x9.bdf
+    ${CMAKE_CURRENT_BINARY_DIR}/5x9.h
+  DEPENDS
+    ${CMAKE_CURRENT_LIST_DIR}/mkfont/*.py
+    ${CMAKE_CURRENT_LIST_DIR}/mkfont/adafruit_bitmap_font/*.py
+    ${CMAKE_CURRENT_LIST_DIR}/mkfont/5x9.bdf
+  )
+add_custom_target(font_h DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/5x9.h)
+add_dependencies(cr100 font_h)
 
 pico_generate_pio_header(cr100 ${CMAKE_CURRENT_BINARY_DIR}/vga_660x477_60.pio)
 pico_generate_pio_header(cr100 ${CMAKE_CURRENT_LIST_DIR}/atkbd.pio)

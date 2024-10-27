@@ -581,6 +581,9 @@ int main(void) {
         // stdio_set_driver_enabled(&stdio_kbd, true);
     }
 
+    scrnprintf("\033[H\033[J\r\n ** \033[1mCR100 Terminal \033[7m READY \033[m "
+               "**\r\n\r\n");
+
     while (true) {
         int c = port_getc();
         if (c > 0) {
