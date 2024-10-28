@@ -471,10 +471,10 @@ static void CUP(struct lw_terminal *term_emul) {
         if ((unsigned int)arg0 > vt100->margin_bottom)
             arg0 = vt100->margin_bottom;
     }
-    if (arg0 >= vt100->height) {
+    if (arg0 >= (int)vt100->height) {
         arg0 = vt100->height - 1;
     }
-    if (arg1 >= vt100->width) {
+    if (arg1 >= (int)vt100->width) {
         arg1 = vt100->width - 1;
     }
     vt100->y = arg0;
@@ -861,7 +861,7 @@ static void DCH(struct lw_terminal *term_emul) {
 
     for (x = vt100->x; x < vt100->width; ++x) {
         int x1 = x + arg0;
-        if (x1 >= vt100->width) {
+        if (x1 >= (int)vt100->width) {
             set(vt100, x, y, ' ');
         } else {
             aset(vt100, x, y, aget(vt100, x1, y));
