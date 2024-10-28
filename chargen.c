@@ -496,7 +496,8 @@ static void master_write(void *user_data, void *buffer_in, size_t len) {
     }
 }
 
-static int map_unicode(void *unused, int n) {
+static int map_unicode(void *unused, int n, lw_cell_t *attr) {
+    (void)attr; // future for sixel inversion
     switch (n) {
     case 9670:
         return 1;

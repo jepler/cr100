@@ -334,7 +334,12 @@ x Pm = 97 / 107      fg/bg Bright White
 x Pm = 99 / 109      fg/bg Bright Default
 */
 
-static int default_map_unicode(void *user_data, int c) { return '?'; }
+static int default_map_unicode(void *user_data, int c, lw_cell_t *attr) {
+    (void)user_data;
+    (void)c;
+    (void)attr;
+    return '?';
+}
 
 static lw_cell_t default_encode_attr(void *user_data,
                                      const struct lw_parsed_attr *attr) {
@@ -1028,6 +1033,9 @@ static void vt100_write_unicode(struct lw_terminal *term_emul, int c) {
     if (c < ' ') {
         return;
     }
+
+    lw_cell_t attr = vt100->attr;
+
     if (vt100->x == vt100->width) {
         if (MODE_IS_SET(vt100, DECAWM))
             NEL(term_emul);
@@ -1038,9 +1046,9 @@ static void vt100_write_unicode(struct lw_terminal *term_emul, int c) {
         c = c - 95;
     }
     if (c >= 0x100) {
-        c = vt100->map_unicode(vt100, c);
+        c = vt100->map_unicode(vt100, c, &attr);
     }
-    set(vt100, vt100->x, vt100->y, c);
+    aset(vt100, vt100->x, vt100->y, c | attr);
     vt100->x += 1;
 }
 
