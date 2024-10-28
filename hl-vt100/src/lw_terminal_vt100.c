@@ -1042,8 +1042,21 @@ static void vt100_write_unicode(struct lw_terminal *term_emul, int c) {
         else
             vt100->x -= 1;
     }
-    if (!vt100->selected_charset && c >= 95 && c < 127) {
-        c = c - 95;
+    if (!vt100->selected_charset && c > 95 && c < 127) {
+        c = c - 95; // you can't hit the glyph at 0 this way, oh well
+    }
+    if (!vt100->unicode && !vt100->selected_charset && c > 32 && c <= 95) {
+        // extension: In the alternate character set, there are also
+        // sixels/sextant chars. Because there's only room for 32 of the 64
+        // in the character bitmap (at 128-160) half are displayed in
+        // inverse video instead.
+        c = c + 64;
+        if (c >= 160) {
+            struct lw_parsed_attr tmp_attr = vt100->parsed_attr;
+            tmp_attr.inverse = !tmp_attr.inverse;
+            c ^= 0x1f;
+            attr = vt100->encode_attr(vt100, &tmp_attr);
+        }
     }
     if (c >= 0x100) {
         c = vt100->map_unicode(vt100, c, &attr);
