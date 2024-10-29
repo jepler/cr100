@@ -496,8 +496,38 @@ static void master_write(void *user_data, void *buffer_in, size_t len) {
     }
 }
 
-static int map_unicode(void *unused, int n) {
+static int map_unicode(void *user_data, int n, lw_cell_t *attr) {
+    struct lw_terminal_vt100 *vt100 = (struct lw_terminal_vt100 *)user_data;
+    if (n >= 0x1fb00 && n <= 0x1fb3b) {
+        n = n - 0x1fb00 +
+            129; // 1fb00 is sextant-1, which lives at position 129
+        if (n >= 169)
+            n++; // the 135 and 246 sextants are elsewhere
+        if (n >= 149)
+            n++;
+        if (n >= 160) { // half of sextants are inverted
+            struct lw_parsed_attr tmp_attr = vt100->parsed_attr;
+            tmp_attr.inverse = !tmp_attr.inverse;
+            n ^= 0x3f;
+            *attr = vt100->encode_attr(vt100, &tmp_attr);
+        }
+        return n;
+    }
     switch (n) {
+    case 9608: {
+        struct lw_parsed_attr tmp_attr = vt100->parsed_attr;
+        tmp_attr.inverse = !tmp_attr.inverse;
+        *attr = vt100->encode_attr(vt100, &tmp_attr);
+        return 32; // FULL BLOCK U+2588
+    }
+    case 9612:
+        return 149; // LEFT HALF BLOCK U+258c
+    case 9616: {
+        struct lw_parsed_attr tmp_attr = vt100->parsed_attr;
+        tmp_attr.inverse = !tmp_attr.inverse;
+        *attr = vt100->encode_attr(vt100, &tmp_attr);
+        return 149; // RIGHT HALF BLOCK U+2590
+    }
     case 9670:
         return 1;
     case 9618:

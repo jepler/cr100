@@ -334,7 +334,12 @@ x Pm = 97 / 107      fg/bg Bright White
 x Pm = 99 / 109      fg/bg Bright Default
 */
 
-static int default_map_unicode(void *user_data, int c) { return '?'; }
+static int default_map_unicode(void *user_data, int c, lw_cell_t *attr) {
+    (void)user_data;
+    (void)c;
+    (void)attr;
+    return '?';
+}
 
 static lw_cell_t default_encode_attr(void *user_data,
                                      const struct lw_parsed_attr *attr) {
@@ -471,10 +476,10 @@ static void CUP(struct lw_terminal *term_emul) {
         if ((unsigned int)arg0 > vt100->margin_bottom)
             arg0 = vt100->margin_bottom;
     }
-    if (arg0 >= vt100->height) {
+    if (arg0 >= (int)vt100->height) {
         arg0 = vt100->height - 1;
     }
-    if (arg1 >= vt100->width) {
+    if (arg1 >= (int)vt100->width) {
         arg1 = vt100->width - 1;
     }
     vt100->y = arg0;
@@ -861,7 +866,7 @@ static void DCH(struct lw_terminal *term_emul) {
 
     for (x = vt100->x; x < vt100->width; ++x) {
         int x1 = x + arg0;
-        if (x1 >= vt100->width) {
+        if (x1 >= (int)vt100->width) {
             set(vt100, x, y, ' ');
         } else {
             aset(vt100, x, y, aget(vt100, x1, y));
@@ -1028,19 +1033,35 @@ static void vt100_write_unicode(struct lw_terminal *term_emul, int c) {
     if (c < ' ') {
         return;
     }
+
+    lw_cell_t attr = vt100->attr;
+
     if (vt100->x == vt100->width) {
         if (MODE_IS_SET(vt100, DECAWM))
             NEL(term_emul);
         else
             vt100->x -= 1;
     }
-    if (!vt100->selected_charset && c >= 95 && c < 127) {
-        c = c - 95;
+    if (!vt100->selected_charset && c > 95 && c < 127) {
+        c = c - 95; // you can't hit the glyph at 0 this way, oh well
+    }
+    if (!vt100->unicode && !vt100->selected_charset && c > 32 && c <= 95) {
+        // extension: In the alternate character set, there are also
+        // sixels/sextant chars. Because there's only room for 32 of the 64
+        // in the character bitmap (at 128-160) half are displayed in
+        // inverse video instead.
+        c = c + 64;
+        if (c >= 160) {
+            struct lw_parsed_attr tmp_attr = vt100->parsed_attr;
+            tmp_attr.inverse = !tmp_attr.inverse;
+            c ^= 0x1f;
+            attr = vt100->encode_attr(vt100, &tmp_attr);
+        }
     }
     if (c >= 0x100) {
-        c = vt100->map_unicode(vt100, c);
+        c = vt100->map_unicode(vt100, c, &attr);
     }
-    set(vt100, vt100->x, vt100->y, c);
+    aset(vt100, vt100->x, vt100->y, c | attr);
     vt100->x += 1;
 }
 
