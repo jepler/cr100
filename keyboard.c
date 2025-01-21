@@ -166,24 +166,41 @@ const char *const symtab[MAX_SYMBOLS] = {
 #undef ENT
 };
 
-#define BIT_SYM (0x2 << 14)
-#define BIT_CMD (0x3 << 14)
-#define MASK_CLASS (0x3 << 14)
+enum KEYPAD_SYMBOLS {
+    KP_0,
+    KP_1,
+    KP_2,
+    KP_3,
+    KP_4,
+    KP_5,
+    KP_6,
+    KP_7,
+    KP_8,
+    KP_9,
+    KP_DOT,
+    MAX_KEYPAD
+};
+
+typedef uint32_t keycode;
+#define BIT_NUM (0x1 << 30)
+#define BIT_SYM (0x2 << 30)
+#define BIT_CMD (0x3 << 30)
+#define MASK_CLASS (0x3 << 30)
 #define CLASSIFY(x) (x & MASK_CLASS)
 #define VALUE(x) (x & ~MASK_CLASS)
 #define IS_SYM(x) (CLASSIFY(x) == BIT_SYM)
 #define IS_CMD(x) (CLASSIFY(x) == BIT_CMD)
-#define MAKE_SYM(x) (BIT_SYM | (int)(x))
-#define MAKE_CMD(x) (BIT_CMD | (int)(x))
-#define CHAR2(c, d) (int)c | (((int)d) << 8)
-#define CHAR2(c, d) (int)c | (((int)d) << 8)
+#define IS_NUM(x) (CLASSIFY(x) == BIT_NUM)
+#define MAKE_SYM(x) (BIT_SYM | (keycode)(x))
+#define MAKE_CMD(x) (BIT_CMD | (keycode)(x))
+#define MAKE_NUM(x) (BIT_NUM | (keycode)(x))
+#define CHAR2(c, d) (keycode) c | (((keycode)d) << 8)
 #define ALPHA(c) CHAR2(c, c ^ ('a' ^ 'A'))
-#define NOMOD(c) CHAR2(c, c)
 
 #define LO(x) (x & 0xff)
 #define HI(x) ((x >> 8) & 0xff)
 
-const uint32_t keyboard_codes[256] = {
+const keycode keyboard_codes[256] = {
     [0x08] = '\033',
     [0x07] = MAKE_SYM(F1),
     [0x0f] = MAKE_SYM(F2),
@@ -267,6 +284,44 @@ const uint32_t keyboard_codes[256] = {
     [0x65] = MAKE_SYM(END),
     [0x6f] = MAKE_SYM(PAGEUP),
     [0x6d] = MAKE_SYM(PAGEDOWN),
+
+    [0x70] = MAKE_NUM(KP_0),
+
+    [0x69] = MAKE_NUM(KP_1),
+    [0x72] = MAKE_NUM(KP_2),
+    [0x7a] = MAKE_NUM(KP_3),
+
+    [0x6b] = MAKE_NUM(KP_4),
+    [0x73] = MAKE_NUM(KP_5),
+    [0x74] = MAKE_NUM(KP_6),
+
+    [0x6c] = MAKE_NUM(KP_7),
+    [0x75] = MAKE_NUM(KP_8),
+    [0x7d] = MAKE_NUM(KP_9),
+
+    [0x71] = MAKE_NUM(KP_DOT),
+
+    // on keypad
+    [0x77] = '/',
+    [0x7e] = '*',
+    [0x84] = '-',
+    [0x7c] = '+',
+    [0x79] = '\n',
+};
+
+struct nument {
+    uint32_t kc_normal, kc_numlock;
+};
+
+const struct nument numtab[MAX_KEYPAD] = {
+#define ENT(x, y, z) [x] = {y, z}
+    ENT(KP_0, MAKE_SYM(INSERT), '0'),     ENT(KP_1, MAKE_SYM(END), '1'),
+    ENT(KP_2, MAKE_SYM(DOWNARROW), '2'),  ENT(KP_3, MAKE_SYM(PAGEDOWN), '3'),
+    ENT(KP_4, MAKE_SYM(LEFTARROW), '4'),  ENT(KP_5, 0, '5'),
+    ENT(KP_6, MAKE_SYM(RIGHTARROW), '6'), ENT(KP_7, MAKE_SYM(HOME), '7'),
+    ENT(KP_8, MAKE_SYM(UPARROW), '8'),    ENT(KP_9, MAKE_SYM(PAGEUP), '9'),
+    ENT(KP_DOT, MAKE_SYM(DELETE), '.'),
+#undef ENT
 };
 
 bool pending_release;
@@ -312,8 +367,9 @@ static void queue_handle_event(queue_t *q, bool release, int value) {
     bool is_ctrl = current_modifiers & (LCTRL | RCTRL);
     bool is_alt = current_modifiers & (LALT | RALT);
     bool is_caps = current_modifiers & (MOD_CAPS);
+    bool is_num = (bool)(current_modifiers & (MOD_NUM)) ^ is_shift;
 
-    int kc = keyboard_codes[value];
+    keycode kc = keyboard_codes[value];
 
     DEBUG("kc=%04x is_[scaX] = %d %d %d %d\r\n", kc, is_shift, is_ctrl, is_alt,
           is_caps);
@@ -321,6 +377,11 @@ static void queue_handle_event(queue_t *q, bool release, int value) {
     if (!kc) {
         scrnprintf("\r\nUn-mapped key: 0x%02x\r\n", value);
         return;
+    }
+
+    if (IS_NUM(kc)) {
+        int sym = VALUE(kc);
+        kc = is_num ? numtab[sym].kc_numlock : numtab[sym].kc_normal;
     }
 
     if (IS_CMD(kc)) {
@@ -384,7 +445,7 @@ void keyboard_poll(queue_t *q) {
         }
     } else if (value == 0xf0) {
         pending_release = true;
-    } else if (!(value & 0x80)) {
+    } else if (value <= 0x84) {
         queue_handle_event(q, pending_release, value);
         pending_release = false;
     }
