@@ -8,6 +8,7 @@
 #include "pico/stdlib.h"
 
 #define EOF (-1)
+#define DEBUG(...) ((void)0)
 
 static int pending_led_value;
 static bool pending_led_flag;
@@ -60,22 +61,27 @@ static bool write_expect_fa(int value, const char *msg) {
     return expect(0xfa, msg);
 }
 bool keyboard_setup(PIO pio) {
+    DEBUG("pre-waiting for keyboard to boot\r");
+    sleep_ms(1600);
+
     gpio_init(KEYBOARD_DATA_PIN);
     gpio_init(KEYBOARD_DATA_PIN + 1);
 
-    gpio_pull_down(KEYBOARD_DATA_PIN);
-    gpio_pull_down(KEYBOARD_DATA_PIN + 1);
+    gpio_pull_up(KEYBOARD_DATA_PIN);
+    gpio_pull_up(KEYBOARD_DATA_PIN + 1);
 
+#if 0
     int i = 0, j = 1;
     while (!(gpio_get(KEYBOARD_DATA_PIN) && gpio_get(KEYBOARD_DATA_PIN + 1))) {
         if (i++ == j) {
-            scrnprintf("Waiting for keyboard to boot... %d ms so far\r", i);
+            DEBUG("Waiting for keyboard to boot... %d ms so far\r", i);
             j *= 10;
         }
         sleep_ms(1);
     }
 
-    sleep_ms(10);
+    sleep_ms(100);
+#endif
 
     kbd_pio = pio;
     uint offset = pio_add_program(pio, &atkbd_program);
@@ -270,6 +276,8 @@ static void queue_add_str(queue_t *q, const char *s) {
 
 static void queue_handle_event(queue_t *q, bool release, int value) {
     int modifiers = keyboard_modifiers[value];
+    DEBUG("queue_handle_event release=%d value=%d modifiers=%d\r\n", release,
+          value, modifiers);
     if (modifiers) {
         if (release) {
             if (modifiers & TOGGLING_MODIFIERS) {
@@ -299,6 +307,10 @@ static void queue_handle_event(queue_t *q, bool release, int value) {
     bool is_caps = current_modifiers & (MOD_CAPS);
 
     int kc = keyboard_codes[value];
+
+    DEBUG("kc=%04x is_[scaX] = %d %d %d %d\r\n", kc, is_shift, is_ctrl, is_alt,
+          is_caps);
+
     if (!kc) {
         scrnprintf("\r\nUn-mapped key: 0x%02x\r\n", value);
         return;
@@ -331,7 +343,7 @@ static void queue_handle_event(queue_t *q, bool release, int value) {
     }
 
     int c = LO(kc);
-    // scrnprintf("c=%d HI=%d is_shift=%d\n", c, HI(kc), is_shift);
+    // DEBUG("c=%d HI=%d is_shift=%d\n", c, HI(kc), is_shift);
     if (HI(kc) && is_shift)
         c = HI(kc);
 #define CTRLABLE(c) (c >= 64 && c <= 127)
@@ -353,9 +365,12 @@ static void queue_handle_event(queue_t *q, bool release, int value) {
 
 void keyboard_poll(queue_t *q) {
     int value = kbd_read_timeout(0);
+
     if (value == EOF) {
         return;
-    } else if (value == 0xfa) {
+    }
+    DEBUG("keyboard_poll %02x\r\n", value);
+    if (value == 0xfa) {
         if (pending_led_flag) {
             kbd_write_blocking(pending_led_value);
             pending_led_flag = false;
@@ -372,7 +387,7 @@ int keyboard_leds;
 
 void keyboard_set_leds(int value) {
     keyboard_leds = value;
-    return;
+    // return;
     if (value != pending_led_value) {
         pending_led_value = value;
         pending_led_flag = true;

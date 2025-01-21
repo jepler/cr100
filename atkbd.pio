@@ -58,7 +58,7 @@ void atkbd_program_init(PIO pio, int sm, int offset, int base_pin) {
 
     sm_config_set_jmp_pin(&c, base_pin + 1);
 
-    sm_config_set_clkdiv(&c, clock_get_hz(clk_sys) / 8000000); // 8 MHz
+    sm_config_set_clkdiv(&c, clock_get_hz(clk_sys) / 100000); // 300kHz
 
     // Set this pin's GPIO function (connect PIO to the pad)
     pio_gpio_init(pio, base_pin);
