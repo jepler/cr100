@@ -166,8 +166,15 @@ const char *const symtab[MAX_SYMBOLS] = {
 #undef ENT
 };
 
-#define SYM(x) (0x8000 | (int)(x))
-#define CMD(x) (0xc000 | (int)(x))
+#define BIT_SYM (0x2 << 14)
+#define BIT_CMD (0x3 << 14)
+#define MASK_CLASS (0x3 << 14)
+#define CLASSIFY(x) (x & MASK_CLASS)
+#define VALUE(x) (x & ~MASK_CLASS)
+#define IS_SYM(x) (CLASSIFY(x) == BIT_SYM)
+#define IS_CMD(x) (CLASSIFY(x) == BIT_CMD)
+#define MAKE_SYM(x) (BIT_SYM | (int)(x))
+#define MAKE_CMD(x) (BIT_CMD | (int)(x))
 #define CHAR2(c, d) (int)c | (((int)d) << 8)
 #define CHAR2(c, d) (int)c | (((int)d) << 8)
 #define ALPHA(c) CHAR2(c, c ^ ('a' ^ 'A'))
@@ -176,25 +183,25 @@ const char *const symtab[MAX_SYMBOLS] = {
 #define LO(x) (x & 0xff)
 #define HI(x) ((x >> 8) & 0xff)
 
-const uint16_t keyboard_codes[256] = {
+const uint32_t keyboard_codes[256] = {
     [0x08] = '\033',
-    [0x07] = SYM(F1),
-    [0x0f] = SYM(F2),
-    [0x17] = SYM(F3),
-    [0x1f] = SYM(F4),
-    [0x27] = SYM(F5),
-    [0x2f] = SYM(F6),
-    [0x37] = SYM(F7),
-    [0x3f] = SYM(F8),
-    [0x47] = SYM(F9),
-    [0x4f] = SYM(F10),
-    [0x56] = SYM(F11),
-    [0x5e] = SYM(F12),
-    [0x57] = SYM(PRTSCR),
-    [0x5f] = SYM(SCRLCK),
-    [0x62] = SYM(PAUSE),
-    [0x67] = SYM(INSERT),
-    [0x64] = SYM(DELETE),
+    [0x07] = MAKE_SYM(F1),
+    [0x0f] = MAKE_SYM(F2),
+    [0x17] = MAKE_SYM(F3),
+    [0x1f] = MAKE_SYM(F4),
+    [0x27] = MAKE_SYM(F5),
+    [0x2f] = MAKE_SYM(F6),
+    [0x37] = MAKE_SYM(F7),
+    [0x3f] = MAKE_SYM(F8),
+    [0x47] = MAKE_SYM(F9),
+    [0x4f] = MAKE_SYM(F10),
+    [0x56] = MAKE_SYM(F11),
+    [0x5e] = MAKE_SYM(F12),
+    [0x57] = MAKE_SYM(PRTSCR),
+    [0x5f] = MAKE_SYM(SCRLCK),
+    [0x62] = MAKE_SYM(PAUSE),
+    [0x67] = MAKE_SYM(INSERT),
+    [0x64] = MAKE_SYM(DELETE),
 
     [0x0e] = CHAR2('`', '~'),
     [0x16] = CHAR2('1', '!'),
@@ -249,17 +256,17 @@ const uint16_t keyboard_codes[256] = {
     [0x41] = CHAR2(',', '<'),
     [0x49] = CHAR2('.', '>'),
     [0x4a] = CHAR2('/', '?'),
-    [0x63] = SYM(UPARROW),
+    [0x63] = MAKE_SYM(UPARROW),
 
     [0x29] = ' ',
-    [0x61] = SYM(LEFTARROW),
-    [0x6a] = SYM(RIGHTARROW),
-    [0x60] = SYM(DOWNARROW),
+    [0x61] = MAKE_SYM(LEFTARROW),
+    [0x6a] = MAKE_SYM(RIGHTARROW),
+    [0x60] = MAKE_SYM(DOWNARROW),
 
-    [0x6e] = SYM(HOME),
-    [0x65] = SYM(END),
-    [0x6f] = SYM(PAGEUP),
-    [0x6d] = SYM(PAGEDOWN),
+    [0x6e] = MAKE_SYM(HOME),
+    [0x65] = MAKE_SYM(END),
+    [0x6f] = MAKE_SYM(PAGEUP),
+    [0x6d] = MAKE_SYM(PAGEDOWN),
 };
 
 bool pending_release;
@@ -316,13 +323,13 @@ static void queue_handle_event(queue_t *q, bool release, int value) {
         return;
     }
 
-    if ((kc & 0xc000) == 0xc000) {
+    if (IS_CMD(kc)) {
         queue_add_data(q, kc);
         return;
     }
 
-    if (kc & 0x8000) {
-        int sym = kc & 0x7fff;
+    if (IS_SYM(kc)) {
+        int sym = VALUE(kc);
         if (is_ctrl && is_alt) {
             if (sym == DELETE) {
                 queue_add_data(q, CMD_REBOOT);
