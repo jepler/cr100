@@ -341,6 +341,8 @@ static int default_map_unicode(void *user_data, int c, lw_cell_t *attr) {
     return '?';
 }
 
+static void do_dummy_bell(void *user_data) {}
+
 static lw_cell_t default_encode_attr(void *user_data,
                                      const struct lw_parsed_attr *attr) {
     (void)user_data;
@@ -1001,6 +1003,10 @@ static void vt100_write_unicode(struct lw_terminal *term_emul, int c) {
         vt100->x = 0;
         return;
     }
+    if (c == '\7') {
+        vt100->do_bell(vt100);
+        return;
+    }
     if (c == '\n' || c == '\013' || c == '\014') {
         if (MODE_IS_SET(vt100, LNM))
             NEL(term_emul);
@@ -1202,6 +1208,7 @@ struct lw_terminal_vt100 *lw_terminal_vt100_init(
     this->lw_terminal->unimplemented = unimplemented;
     this->master_write = master_write;
     this->encode_attr = encode_attr ? encode_attr : default_encode_attr;
+    this->do_bell = do_dummy_bell;
     this->map_unicode = default_map_unicode;
     lw_terminal_vt100_read_str(this,
                                "\033[m\033[?7h"); // set default attributes

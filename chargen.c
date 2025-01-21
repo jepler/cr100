@@ -153,8 +153,11 @@ int scrnprintf(const char *fmt, ...) {
     return n;
 }
 
-static uint16_t base_shade[] = {0,     0x554, 0xaa8, 0xffc, 0, 0x554,
-                                0xaa8, 0xffc, 0,     0,     0, 0};
+// note: not in flash (referenced from core1 generator thread)
+static uint16_t base_shade[] = {0,     0x554, 0xaa8, 0xffc, 0,     0x554,
+                                0xaa8, 0xffc, 0,     0,     0,     0,
+                                0xffc, 0xaa8, 0x554, 0x000, 0xffc, 0xaa8,
+                                0x554, 0x000, 0xffc, 0xffc, 0xffc, 0xffc};
 
 #if !STANDALONE
 static void setup_vga_hsync(PIO pio) {
@@ -183,24 +186,30 @@ static void setup_vga(void) {
     setup_vga_hsync(pio0);
 }
 
+int frameno = 0;
+int bell_frame_end = -1;
 __attribute__((noreturn, noinline)) static void
 __not_in_flash_func(core1_loop)(void) {
-    int frameno = 0;
     while (true) {
+        uint16_t *shade_ptr = frameno & 0x20 ? base_shade : base_shade + 4;
+        if (bell_frame_end > frameno) {
+            shade_ptr += 12;
+        }
         for (int row = 0; row < FB_HEIGHT_CHAR; row++) {
             uint32_t *chardata =
                 row == FB_HEIGHT_CHAR - 1
                     ? (uint32_t *)statusline
                     : (uint32_t *)lw_terminal_vt100_getline(vt100, row);
             for (int j = 0; j < CHAR_Y; j++) {
-                scan_convert(chardata, &chargen[256 * j],
-                             frameno & 0x20 ? base_shade : base_shade + 4);
+                scan_convert(chardata, &chargen[256 * j], shade_ptr);
             }
         }
 
         frameno += 1;
     }
 }
+
+static void visual_bell(void *_) { bell_frame_end = frameno + 15; }
 
 static __attribute__((noreturn, noinline)) void
 __not_in_flash_func(core1_entry)(void) {
@@ -602,6 +611,7 @@ int main(void) {
     vt100 = lw_terminal_vt100_init(NULL, NULL, master_write, char_attr,
                                    FB_WIDTH_CHAR, FB_HEIGHT_CHAR - 1);
     vt100->map_unicode = map_unicode;
+    vt100->do_bell = visual_bell;
     multicore_launch_core1(core1_entry);
 
     scrnprintf(" \r");
