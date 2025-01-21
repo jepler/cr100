@@ -29,6 +29,9 @@ class OffsetBitmap:
         return 0
 
 
+CHAR_COUNT = 512
+
+
 def main(bdf, header):
     font = bitmap_font.load_font(bdf, Bitmap)
     width, height, dx, dy = font.get_bounding_box()
@@ -36,11 +39,11 @@ def main(bdf, header):
     #    if width != 5 or height != 9:
     #        raise SystemExit("sorry, only 5x9 monospace fonts supported")
 
-    output_data = array.array("H", [0] * 9 * 256)
+    output_data = array.array("H", [0] * 9 * CHAR_COUNT)
 
-    font.load_glyphs(range(256))
+    font.load_glyphs(range(CHAR_COUNT))
 
-    for i in range(256):
+    for i in range(CHAR_COUNT):
         g = font.get_glyph(i)
         if g is None:
             continue
@@ -53,7 +56,7 @@ def main(bdf, header):
                 (bitmap[1, j], 6, 7),
                 (bitmap[0, j], 8, 9),
             )
-            output_data[j * 256 + i] = d << 2
+            output_data[j * CHAR_COUNT + i] = d << 2
     for x in output_data:
         print(f"0x{x:04x},", file=header)
 

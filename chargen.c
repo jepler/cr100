@@ -38,6 +38,12 @@ int pixels_sm;
 #define CHAR_Y (9)
 #define FB_HEIGHT_PIXEL (FB_HEIGHT_CHAR * CHAR_Y)
 
+#define ATTR_BASE 9
+#define BG_ATTR(x) ((x) << 11)
+#define FG_ATTR(x) ((x) << ATTR_BASE)
+
+#define MAKE_ATTR(fg, bg) (((fg) ^ (((bg)*9) & 073)) << ATTR_BASE)
+
 struct lw_terminal_vt100 *vt100;
 
 // declaring this static breaks it (why?)
@@ -50,10 +56,10 @@ void __not_in_flash_func(scan_convert)(const uint32_t *restrict cptr32,
 #define READ_CHARDATA (ch = *cptr32++)
 #define ONE_CHAR(in_shift, op, out_shift)                                      \
     do {                                                                       \
-        chardata = cgptr[(ch >> (in_shift)) & 0xff];                           \
-        mask = shade[(ch >> (8 + (in_shift))) & 7];                            \
-        pixels op(shade[(ch >> (11 + (in_shift))) & 7] ^ (chardata & mask))    \
-            out_shift;                                                         \
+        chardata = cgptr[(ch >> (in_shift)) & ((1 << ATTR_BASE) - 1)];         \
+        mask = shade[(ch >> (ATTR_BASE + (in_shift))) & 7];                    \
+        pixels op(shade[(ch >> (ATTR_BASE + 3 + (in_shift))) & 7] ^            \
+                  (chardata & mask)) out_shift;                                \
     } while (0)
 
     uint32_t ch;
@@ -113,7 +119,8 @@ void __not_in_flash_func(scan_convert)(const uint32_t *restrict cptr32,
     SIX_CHARS; /* 132 */
 }
 
-uint16_t chargen[256 * CHAR_Y] = {
+#define CHAR_COUNT (512)
+uint16_t chargen[CHAR_COUNT * CHAR_Y] = {
 #include "5x9.h"
 };
 
@@ -127,12 +134,12 @@ static int status_printf(const char *fmt, ...) {
     va_start(ap, fmt);
     int n = vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
-    int attr = 0x300;
+    int attr = 0x3 << ATTR_BASE;
     int i, j;
     for (i = j = 0; j < FB_WIDTH_CHAR && buf[i]; i++) {
         int c = (unsigned char)buf[i];
         if (c < 32) {
-            attr = c << 8;
+            attr = c << ATTR_BASE;
         } else {
             statusline[j++] = c | attr;
         }
@@ -201,7 +208,7 @@ __not_in_flash_func(core1_loop)(void) {
                     ? (uint32_t *)statusline
                     : (uint32_t *)lw_terminal_vt100_getline(vt100, row);
             for (int j = 0; j < CHAR_Y; j++) {
-                scan_convert(chardata, &chargen[256 * j], shade_ptr);
+                scan_convert(chardata, &chargen[CHAR_COUNT * j], shade_ptr);
             }
         }
 
@@ -230,12 +237,6 @@ __not_in_flash_func(core1_entry)(void) {
     core1_loop();
 }
 #endif
-
-#define BG_ATTR(x) ((x) << 11)
-#define FG_ATTR(x) ((x) << 8)
-
-#define MAKE_ATTR(fg, bg) (((fg) ^ (((bg)*9) & 073)) << 8)
-
 static int map_one(int i) { return (i > 0) + (i > 6); }
 
 static lw_cell_t char_attr(void *user_data, const struct lw_parsed_attr *attr) {
@@ -525,6 +526,12 @@ static int map_unicode(void *user_data, int n, lw_cell_t *attr) {
         return n;
     }
     switch (n) {
+    case 0x2191: // upwards arrow
+        return 0x100;
+    case 0x2193: // downwards  arrow
+        return 0x101;
+    case 0x25ae: // black vertical rectangle
+        return 0x102;
     case 9608: {
         struct lw_parsed_attr tmp_attr = vt100->parsed_attr;
         tmp_attr.inverse = !tmp_attr.inverse;
