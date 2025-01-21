@@ -23,6 +23,7 @@
 #include "vga_660x477_60.pio.h"
 
 #include "lw_terminal_vt100.h"
+#define DEBUG(...) ((void)0)
 
 int pixels_sm;
 
@@ -451,6 +452,7 @@ static int stdio_kbd_in_chars(char *buf, int length) {
     int code;
     keyboard_poll(&keyboard_queue);
     while (length && queue_try_remove(&keyboard_queue, &code)) {
+        DEBUG("code=%04x\r\n", code);
         if ((code & 0xc000) == 0xc000) {
             switch (code) {
             case CMD_SWITCH_RATE:
@@ -606,9 +608,9 @@ int main(void) {
 
     port_activate();
 
-    if (keyboard_setup(pio1)) {
-        queue_init(&keyboard_queue, sizeof(int), 64);
-        // stdio_set_driver_enabled(&stdio_kbd, true);
+    queue_init(&keyboard_queue, sizeof(int), 64);
+    if (!keyboard_setup(pio1)) {
+        scrnprintf("KEYBOARD INIT FAILED\r\n");
     }
 
     scrnprintf("\033[H\033[J\r\n ** \033[1mCR100 Terminal \033[7m READY \033[m "
