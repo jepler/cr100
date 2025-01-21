@@ -43,7 +43,7 @@ static int parity(int x) {
 }
 static void kbd_write_blocking(int value) {
     value = value | (parity(value) << 8);
-    pio_sm_put_blocking(kbd_pio, kbd_sm, value);
+    pio_sm_put_blocking(kbd_pio, kbd_sm, ~value);
 }
 
 static bool expect(int expected, const char *msg) {
